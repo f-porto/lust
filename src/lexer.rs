@@ -6,14 +6,37 @@ use std::{
 use crate::{error::LustError, tokens::Token};
 
 pub struct Lexer<'a> {
+    code: &'a str,
     chars: Peekable<Enumerate<Chars<'a>>>,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(code: &'a str) -> Self {
         Self {
+            code,
             chars: code.chars().enumerate().peekable(),
         }
+    }
+
+    fn read_quoted_string(&mut self, quote: char) -> Result<usize, LustError> {
+        let mut escaped = false;
+        println!();
+        while let Some(char) = self.chars.next() {
+            print!("{:?}", char.1);
+            match char {
+                (_, '\\') => escaped = !escaped,
+                (end, char) if char == quote => {
+                    if !escaped {
+                        return Ok(end);
+                    } else {
+                        escaped = false;
+                    }
+                }
+                _ => escaped = false,
+            }
+        }
+
+        Err(LustError::UnfinishedString)
     }
 }
 
@@ -107,6 +130,10 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 _ => Token::Dot,
             },
+            (start, quote @ ('\'' | '"')) => match self.read_quoted_string(quote) {
+                Ok(end) => Token::String(&self.code[(start + 1)..end]),
+                Err(why) => return Some(Err(why)),
+            },
             (_, char) => return Some(Err(LustError::UnexpectedChar(char))),
         };
 
@@ -116,11 +143,25 @@ impl<'a> Iterator for Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::read_to_string, path::Path};
+
     use super::*;
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn read_single_quoted_string() -> Result<(), LustError> {
+    fn read_string() -> Result<(), LustError> {
+        let path = Path::new("./lua/strings.lua");
+        let content = read_to_string(path).expect("Should read ./lua/strings.lua should exists");
+
+        compare(
+            &content,
+            &[
+                Token::String("s alo\\n123\""),
+                Token::String("d alo\\n123\\\""),
+                Token::String("\\97lo\\10\\04923\""),
+            ],
+        )?;
+
         Ok(())
     }
 

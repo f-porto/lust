@@ -6,12 +6,14 @@ use std::{
 #[derive(Debug, PartialEq)]
 pub enum LustError {
     UnexpectedChar(char),
+    UnfinishedString,
 }
 
 impl Display for LustError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            LustError::UnexpectedChar(char) => write!(f, "Unexpected char: `{char}`"),
+            Self::UnexpectedChar(char) => write!(f, "Unexpected char: `{char}`"),
+            Self::UnfinishedString => write!(f, "Unfinished string"),
         }
     }
 }

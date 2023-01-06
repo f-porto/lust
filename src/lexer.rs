@@ -38,6 +38,35 @@ impl<'a> Lexer<'a> {
 
         Err(LustError::UnfinishedString)
     }
+
+    fn read_raw_string(&mut self) -> Result<&'a str, LustError> {
+        let mut equals = 0usize;
+        while self.chars.next_if(|(_, char)| *char == '=').is_some() {
+            equals += 1;
+        }
+
+        let start;
+        match self.chars.next() {
+            Some((pos, '[')) => start = pos + 1,
+            Some((_, char)) => return Err(LustError::UnexpectedChar(char)),
+            None => return Err(LustError::MissingCharacter),
+        };
+
+        while let Some((end, char)) = self.chars.next() {
+            if char == ']' {
+                let mut end_equals = 0usize;
+                while self.chars.next_if(|(_, char)| *char == '=').is_some() {
+                    end_equals += 1;
+                }
+                match self.chars.next() {
+                    Some((_, ']')) if equals == end_equals => return Ok(&self.code[start..end]),
+                    _ => {}
+                };
+            }
+        }
+
+        Err(LustError::UnfinishedString)
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -62,11 +91,17 @@ impl<'a> Iterator for Lexer<'a> {
             (_, ';') => Token::Semicolon,
             (_, ',') => Token::Comma,
             (_, '(') => Token::LeftParenthesis,
-            (_, '[') => Token::LeftBracket,
-            (_, '{') => Token::LeftBrace,
             (_, ')') => Token::RightParenthesis,
-            (_, ']') => Token::RightBracket,
+            (_, '{') => Token::LeftBrace,
             (_, '}') => Token::RightBrace,
+            (_, ']') => Token::RightBracket,
+            (_, '[') => match self.chars.peek() {
+                Some((_, '[' | '=')) => match self.read_raw_string() {
+                    Ok(str) => Token::String(str),
+                    Err(why) => return Some(Err(why)),
+                },
+                _ => Token::LeftBracket,
+            },
             (_, '/') => match self.chars.peek() {
                 Some((_, '/')) => {
                     self.chars.next();
@@ -153,16 +188,18 @@ mod tests {
         let path = Path::new("./lua/strings.lua");
         let content = read_to_string(path).expect("Should read ./lua/strings.lua should exists");
 
+        println!("{}", content);
+
         compare(
             &content,
             &[
                 Token::String("s alo\\n123\""),
                 Token::String("d alo\\n123\\\""),
                 Token::String("\\97lo\\10\\04923\""),
+                Token::String("0 alo\n123\""),
+                Token::String("2\nalo\n123\""),
             ],
-        )?;
-
-        Ok(())
+        )
     }
 
     #[test]

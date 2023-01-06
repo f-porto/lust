@@ -7,6 +7,7 @@ use std::{
 pub enum LustError {
     UnexpectedChar(char),
     UnfinishedString,
+    MissingCharacter,
 }
 
 impl Display for LustError {
@@ -14,6 +15,7 @@ impl Display for LustError {
         match self {
             Self::UnexpectedChar(char) => write!(f, "Unexpected char: `{char}`"),
             Self::UnfinishedString => write!(f, "Unfinished string"),
+            Self::MissingCharacter => write!(f, "Missing something"),
         }
     }
 }

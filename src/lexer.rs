@@ -18,16 +18,14 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_quoted_string(&mut self, quote: char) -> Result<usize, LustError> {
+    fn read_quoted_string(&mut self, start: usize, quote: char) -> Result<&'a str, LustError> {
         let mut escaped = false;
-        println!();
         while let Some(char) = self.chars.next() {
-            print!("{:?}", char.1);
             match char {
                 (_, '\\') => escaped = !escaped,
                 (end, char) if char == quote => {
                     if !escaped {
-                        return Ok(end);
+                        return Ok(&self.code[start..end]);
                     } else {
                         escaped = false;
                     }
@@ -67,6 +65,73 @@ impl<'a> Lexer<'a> {
 
         Err(LustError::UnfinishedString)
     }
+
+    fn read_number(
+        &mut self,
+        start: usize,
+        started_with_digit: bool,
+    ) -> Result<&'a str, LustError> {
+        if started_with_digit {
+            while let Some((e, char)) = self.chars.peek() {
+                match char {
+                    '0'..='9' => {
+                        self.chars.next();
+                    }
+                    '.' => {
+                        self.chars.next();
+                        break;
+                    }
+                    'e' | 'E' => {
+                        break;
+                    }
+                    _ => return Ok(&self.code[start..*e]),
+                };
+            }
+        } else {
+            let Some((_, '0'..='9')) = self.chars.next() else {
+                return Err(LustError::MalformedNumber);
+            };
+        }
+
+        while let Some((e, char)) = self.chars.peek() {
+            match char {
+                '0'..='9' => {
+                    self.chars.next();
+                }
+                'e' | 'E' => {
+                    self.chars.next();
+                    break;
+                }
+                _ => return Ok(&self.code[start..*e]),
+            };
+        }
+
+        match self.chars.peek() {
+            Some((_, '-' | '+')) => {
+                self.chars.next();
+            }
+            _ => {}
+        };
+
+        let mut end;
+        match self.chars.peek() {
+            Some((e, '0'..='9')) => {
+                end = *e;
+                self.chars.next();
+            }
+            _ => return Err(LustError::MalformedNumber),
+        };
+
+        while let Some((e, _)) = self.chars.next_if(|(_, char)| ('0'..='9').contains(char)) {
+            end = e;
+        }
+
+        Ok(&self.code[start..=end])
+    }
+
+    fn read_hexadecimal(&mut self) -> Result<&'a str, LustError> {
+        Ok("")
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -101,6 +166,23 @@ impl<'a> Iterator for Lexer<'a> {
                     Err(why) => return Some(Err(why)),
                 },
                 _ => Token::LeftBracket,
+            },
+            (start, '0') => match self.chars.peek() {
+                Some((_, 'x' | 'X')) => {
+                    self.chars.next();
+                    match self.read_hexadecimal() {
+                        Ok(str) => Token::Number(str),
+                        Err(why) => return Some(Err(why)),
+                    }
+                }
+                _ => match self.read_number(start, true) {
+                    Ok(str) => Token::Number(str),
+                    Err(why) => return Some(Err(why)),
+                },
+            },
+            (start, '1'..='9') => match self.read_number(start, true) {
+                Ok(str) => Token::Number(str),
+                Err(why) => return Some(Err(why)),
             },
             (_, '/') => match self.chars.peek() {
                 Some((_, '/')) => {
@@ -152,7 +234,11 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 _ => Token::Colon,
             },
-            (_, '.') => match self.chars.peek() {
+            (start, '.') => match self.chars.peek() {
+                Some((_, '0'..='9')) => match self.read_number(start, false) {
+                    Ok(str) => Token::Number(str),
+                    Err(why) => return Some(Err(why)),
+                },
                 Some((_, '.')) => {
                     self.chars.next();
                     match self.chars.peek() {
@@ -165,8 +251,8 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 _ => Token::Dot,
             },
-            (start, quote @ ('\'' | '"')) => match self.read_quoted_string(quote) {
-                Ok(end) => Token::String(&self.code[(start + 1)..end]),
+            (start, quote @ ('\'' | '"')) => match self.read_quoted_string(start + 1, quote) {
+                Ok(str) => Token::String(str),
                 Err(why) => return Some(Err(why)),
             },
             (_, char) => return Some(Err(LustError::UnexpectedChar(char))),
@@ -184,11 +270,31 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
+    fn decimal_numbers() -> Result<(), LustError> {
+        let path = Path::new("./lua/base_10_numbers.lua");
+        let content = read_to_string(path).expect("Should read ./lua/base_10_numbers.lua");
+
+        compare(
+            &content,
+            &[
+                Token::Number("3"),
+                Token::Number("345"),
+                Token::Number("3.0"),
+                Token::Number("3.1416"),
+                Token::Number("314.16e-2"),
+                Token::Number("0.31416E1"),
+                Token::Number("34e1"),
+                Token::Number("123e+43"),
+                Token::Number(".12e34"),
+                Token::Number("1.e34"),
+            ],
+        )
+    }
+
+    #[test]
     fn read_string() -> Result<(), LustError> {
         let path = Path::new("./lua/strings.lua");
-        let content = read_to_string(path).expect("Should read ./lua/strings.lua should exists");
-
-        println!("{}", content);
+        let content = read_to_string(path).expect("Should read ./lua/strings.lua");
 
         compare(
             &content,

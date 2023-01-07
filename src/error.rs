@@ -8,6 +8,7 @@ pub enum LustError {
     UnexpectedChar(char),
     UnfinishedString,
     MissingCharacter,
+    MalformedNumber,
 }
 
 impl Display for LustError {
@@ -16,6 +17,7 @@ impl Display for LustError {
             Self::UnexpectedChar(char) => write!(f, "Unexpected char: `{char}`"),
             Self::UnfinishedString => write!(f, "Unfinished string"),
             Self::MissingCharacter => write!(f, "Missing something"),
+            Self::MalformedNumber => write!(f, "Malformed number"),
         }
     }
 }

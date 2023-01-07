@@ -129,8 +129,58 @@ impl<'a> Lexer<'a> {
         Ok(&self.code[start..=end])
     }
 
-    fn read_hexadecimal(&mut self) -> Result<&'a str, LustError> {
-        Ok("")
+    fn read_hexadecimal(&mut self, start: usize) -> Result<&'a str, LustError> {
+        while let Some((e, char)) = self.chars.peek() {
+            match char {
+                '0'..='9' | 'a'..='f' | 'A'..='F' => {
+                    self.chars.next();
+                }
+                '.' => {
+                    self.chars.next();
+                    break;
+                }
+                'p' | 'P' => {
+                    break;
+                }
+                _ => return Ok(&self.code[start..*e]),
+            };
+        }
+
+        while let Some((e, char)) = self.chars.peek() {
+            match char {
+                '0'..='9' | 'a'..='f' | 'A'..='F' => {
+                    self.chars.next();
+                }
+                'p' | 'P' => {
+                    self.chars.next();
+                    break;
+                }
+                _ => return Ok(&self.code[start..*e]),
+            };
+        }
+
+        match self.chars.peek() {
+            Some((_, '-' | '+')) => {
+                self.chars.next();
+            }
+            _ => {}
+        };
+
+        let mut end;
+        match self.chars.peek() {
+            Some((e, '0'..='9' | 'a'..='f' | 'A'..='F')) => {
+                end = *e;
+                self.chars.next();
+            }
+            _ => return Err(LustError::MalformedNumber),
+        };
+
+        while let Some((e, '0'..='9' | 'a'..='f' | 'A'..='F')) = self.chars.peek() {
+            end = *e;
+            self.chars.next();
+        }
+
+        Ok(&self.code[start..=end])
     }
 }
 
@@ -170,7 +220,7 @@ impl<'a> Iterator for Lexer<'a> {
             (start, '0') => match self.chars.peek() {
                 Some((_, 'x' | 'X')) => {
                     self.chars.next();
-                    match self.read_hexadecimal() {
+                    match self.read_hexadecimal(start) {
                         Ok(str) => Token::Number(str),
                         Err(why) => return Some(Err(why)),
                     }
@@ -269,13 +319,32 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    fn read_lua_file(filename: &str) -> String {
+        let path = format!("./lua/{}.lua", filename);
+        let path = Path::new(&path);
+        read_to_string(path).expect(&format!("Should read ./lua/{}.lua", filename))
+    }
+
+    #[test]
+    fn hexadecimal_numbers() -> Result<(), LustError> {
+        compare(
+            &read_lua_file("base_16_numbers"),
+            &[
+                Token::Number("0xff"),
+                Token::Number("0xBEBADA"),
+                Token::Number("0x0.1E"),
+                Token::Number("0xA23p-4"),
+                Token::Number("0X1.921FB54442D18P+1"),
+                Token::Number("0x.23p-4"),
+                Token::Number("0x3234.p+3"),
+            ],
+        )
+    }
+
     #[test]
     fn decimal_numbers() -> Result<(), LustError> {
-        let path = Path::new("./lua/base_10_numbers.lua");
-        let content = read_to_string(path).expect("Should read ./lua/base_10_numbers.lua");
-
         compare(
-            &content,
+            &read_lua_file("base_10_numbers"),
             &[
                 Token::Number("3"),
                 Token::Number("345"),
@@ -293,11 +362,8 @@ mod tests {
 
     #[test]
     fn read_string() -> Result<(), LustError> {
-        let path = Path::new("./lua/strings.lua");
-        let content = read_to_string(path).expect("Should read ./lua/strings.lua");
-
         compare(
-            &content,
+            &read_lua_file("strings"),
             &[
                 Token::String("s alo\\n123\""),
                 Token::String("d alo\\n123\\\""),

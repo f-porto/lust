@@ -182,6 +182,16 @@ impl<'a> Lexer<'a> {
 
         Ok(&self.code[start..=end])
     }
+
+    fn read_identifier(&mut self, start: usize) -> Result<&'a str, LustError> {
+        let mut end = start;
+        while let Some((e, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')) = self.chars.peek() {
+            end = *e;
+            self.chars.next();
+        }
+
+        Ok(&self.code[start..=end])
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -305,6 +315,10 @@ impl<'a> Iterator for Lexer<'a> {
                 Ok(str) => Token::String(str),
                 Err(why) => return Some(Err(why)),
             },
+            (start, 'a'..='z' | 'A'..='Z' | '_') => match self.read_identifier(start) {
+                Ok(str) => Token::str_to_keyword(str).unwrap_or(Token::Identifier(str)),
+                Err(why) => return Some(Err(why)),
+            },
             (_, char) => return Some(Err(LustError::UnexpectedChar(char))),
         };
 
@@ -323,6 +337,55 @@ mod tests {
         let path = format!("./lua/{}.lua", filename);
         let path = Path::new(&path);
         read_to_string(path).expect(&format!("Should read ./lua/{}.lua", filename))
+    }
+
+    #[test]
+    fn read_keywords() -> Result<(), LustError> {
+        compare(
+            &read_lua_file("keywords"),
+            &[
+                Token::And,
+                Token::Break,
+                Token::Do,
+                Token::Else,
+                Token::Elseif,
+                Token::End,
+                Token::False,
+                Token::For,
+                Token::Function,
+                Token::Goto,
+                Token::If,
+                Token::In,
+                Token::Local,
+                Token::Nil,
+                Token::Not,
+                Token::Or,
+                Token::Repeat,
+                Token::Return,
+                Token::Then,
+                Token::True,
+                Token::Until,
+                Token::While,
+            ],
+        )
+    }
+
+    #[test]
+    fn read_identifiers() -> Result<(), LustError> {
+        compare(
+            &read_lua_file("identifiers"),
+            &[
+                Token::Identifier("a"),
+                Token::Identifier("A"),
+                Token::Identifier("_"),
+                Token::Identifier("_02312"),
+                Token::Identifier("_sdaf"),
+                Token::Identifier("_ASFDS"),
+                Token::Identifier("af_ads"),
+                Token::Identifier("ASD_DFSD"),
+                Token::Identifier("a03fDfsd_efwe839ruEEFwf43e_"),
+            ],
+        )
     }
 
     #[test]

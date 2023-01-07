@@ -75,6 +75,38 @@ pub enum Token<'a> {
     TripleDot,
 }
 
+impl<'a> Token<'a> {
+    pub fn str_to_keyword(code: &'a str) -> Option<Token<'a>> {
+        let keyword = match code {
+            "and" => Token::And,
+            "break" => Token::Break,
+            "do" => Token::Do,
+            "else" => Token::Else,
+            "elseif" => Token::Elseif,
+            "end" => Token::End,
+            "false" => Token::False,
+            "for" => Token::For,
+            "function" => Token::Function,
+            "goto" => Token::Goto,
+            "if" => Token::If,
+            "in" => Token::In,
+            "local" => Token::Local,
+            "nil" => Token::Nil,
+            "not" => Token::Not,
+            "or" => Token::Or,
+            "repeat" => Token::Repeat,
+            "return" => Token::Return,
+            "then" => Token::Then,
+            "true" => Token::True,
+            "until" => Token::Until,
+            "while" => Token::While,
+            _ => return None,
+        };
+
+        Some(keyword)
+    }
+}
+
 // and       break     do        else      elseif    end
 // false     for       function  goto      if        in
 // local     nil       not       or        repeat    return

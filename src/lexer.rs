@@ -3,7 +3,7 @@ use std::{
     str::Chars,
 };
 
-use crate::{error::LustError, tokens::Token};
+use crate::{error::LustError, token::Token};
 
 pub struct Lexer<'a> {
     code: &'a str,
@@ -390,6 +390,7 @@ mod tests {
     fn read_lua_file(filename: &str) -> String {
         let path = format!("./lua/{}.lua", filename);
         let path = Path::new(&path);
+
         read_to_string(path).expect(&format!("Should read ./lua/{}.lua", filename))
     }
 

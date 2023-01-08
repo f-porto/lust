@@ -9,6 +9,9 @@ pub enum LustError {
     UnfinishedString,
     MissingCharacter,
     MalformedNumber,
+
+    NothingToParse,
+    UnexpectedToken(String),
 }
 
 impl Display for LustError {
@@ -18,6 +21,8 @@ impl Display for LustError {
             Self::UnfinishedString => write!(f, "Unfinished string"),
             Self::MissingCharacter => write!(f, "Missing something"),
             Self::MalformedNumber => write!(f, "Malformed number"),
+            Self::NothingToParse => write!(f, "Nothing to parse"),
+            Self::UnexpectedToken(token) => write!(f, "Unexpected token: {}", token),
         }
     }
 }

@@ -192,21 +192,75 @@ impl<'a> Lexer<'a> {
 
         Ok(&self.code[start..=end])
     }
+
+    fn skip_line_comment(&mut self) {
+        match self.chars.next() {
+            Some((_, '[')) => match self.chars.next() {
+                Some((_, '[')) => {
+                    self.skip_block_comment();
+                    return;
+                }
+                Some((_, '\n')) => return,
+                _ => {}
+            },
+            Some((_, '\n')) => return,
+            _ => {}
+        }
+        while let Some((_, char)) = self.chars.next() {
+            if char == '\n' {
+                break;
+            }
+        }
+    }
+
+    fn skip_block_comment(&mut self) {
+        let mut end_brackets = 0;
+        while let Some((_, char)) = self.chars.next() {
+            if char == ']' {
+                end_brackets += 1;
+            } else {
+                end_brackets = 0;
+            }
+            if end_brackets == 2 {
+                break;
+            }
+        }
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self
+            .chars
+            .next_if(|(_, char)| char.is_whitespace())
+            .is_some()
+        {}
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token<'a>, LustError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self
-            .chars
-            .next_if(|(_, char)| char.is_whitespace())
-            .is_some()
-        {}
+        self.skip_whitespace();
+
+        loop {
+            match self.chars.peek() {
+                Some((_, '-')) => {
+                    self.chars.next();
+                    match self.chars.peek() {
+                        Some((_, '-')) => {
+                            self.chars.next();
+                            self.skip_line_comment();
+                        }
+                        _ => return Some(Ok(Token::Minus)),
+                    }
+                }
+                _ => break,
+            };
+            self.skip_whitespace();
+        }
 
         let token = match self.chars.next()? {
             (_, '+') => Token::Plus,
-            (_, '-') => Token::Minus,
             (_, '*') => Token::Asterisk,
             (_, '%') => Token::Percent,
             (_, '^') => Token::Circumflex,
@@ -507,6 +561,31 @@ mod tests {
         assert_eq!(None, lexer.next());
 
         Ok(())
+    }
+
+    #[test]
+    fn comments() -> Result<(), LustError> {
+        compare(
+            &read_lua_file("comments"),
+            &[
+                Token::Identifier("print0"),
+                Token::LeftParenthesis,
+                Token::String("This is fine"),
+                Token::RightParenthesis,
+                Token::Identifier("print1"),
+                Token::LeftParenthesis,
+                Token::String("This execute"),
+                Token::RightParenthesis,
+                Token::Identifier("print2"),
+                Token::LeftParenthesis,
+                Token::String("between block comments"),
+                Token::RightParenthesis,
+                Token::Identifier("print3"),
+                Token::LeftParenthesis,
+                Token::String("between comments"),
+                Token::RightParenthesis,
+            ],
+        )
     }
 
     #[test]

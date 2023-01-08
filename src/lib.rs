@@ -1,3 +1,5 @@
+mod ast;
 mod error;
 mod lexer;
-mod tokens;
+mod parser;
+mod token;

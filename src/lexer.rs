@@ -550,16 +550,16 @@ mod tests {
     }
 
     fn compare(code: &str, expected_tokens: &[Token]) -> Result<(), LustError> {
-        let mut lexer = Lexer::new(&code);
+        let mut lexer = Lexer::new(code);
 
         for (i, expected_token) in expected_tokens.into_iter().enumerate() {
             let Some(actual_token) = lexer.next() else {
                 panic!("{i}: Expected {expected_token:?} but got nothing");
             };
 
-            assert_eq!((i, expected_token), (i, &actual_token?));
+            assert_eq!((i, &actual_token?), (i, expected_token));
         }
-        assert_eq!(None, lexer.next());
+        assert_eq!(lexer.next(), None);
 
         Ok(())
     }

@@ -10,11 +10,11 @@ pub enum Statement<'a> {
         args: Vec<Expression<'a>>,
     },
     Label {
-        identifier: &'a str,
+        name: Name<'a>,
     },
     Break,
     Goto {
-        identifier: &'a str,
+        name: Name<'a>,
     },
     Do {
         block: Block<'a>,
@@ -33,34 +33,85 @@ pub enum Statement<'a> {
         alternative: Box<Option<Statement<'a>>>,
     },
     NumericFor {
-        var: Expression<'a>,
+        var: Name<'a>,
         start: Expression<'a>,
         limit: Expression<'a>,
         step: Option<Expression<'a>>,
         block: Block<'a>,
     },
     GenericFor {
-        vars: Vec<Expression<'a>>,
+        vars: NameList<'a>,
         exprs: Vec<Expression<'a>>,
         block: Block<'a>,
     },
     FunctionDecl {
-        expression: Expression<'a>,
-        args: Vec<Expression<'a>>,
+        name: FunctionName<'a>,
+        parameters: ParameterList<'a>,
+        block: Block<'a>,
     },
     LocalFunctionDecl {
-        expression: Expression<'a>,
-        args: Vec<Expression<'a>>,
+        name: Name<'a>,
+        args: ParameterList<'a>,
     },
     LocalAttrs {
-        attrs: Vec<Expression<'a>>,
+        attrs: AttributeList<'a>,
         expressions: Vec<Expression<'a>>,
     },
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Attribute<'a> {
+    pub name: Name<'a>,
+    pub attr: Option<Name<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct AttributeList<'a> {
+    pub attributes: Vec<Attribute<'a>>,
+}
+
+impl<'a> AttributeList<'a> {
+    pub fn push(&mut self, attribute: Attribute<'a>) {
+        self.attributes.push(attribute);
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionName<'a> {
+    pub name: Name<'a>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ParameterList<'a> {
+    pub parameters: NameList<'a>,
+    pub var_args: Option<Expression<'a>>,
+}
+
+impl<'a> ParameterList<'a> {
+    pub fn push(&mut self, parameter: Name<'a>) {
+        self.parameters.push(parameter);
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Name<'a> {
+    pub name: &'a str,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct NameList<'a> {
+    pub names: Vec<Name<'a>>,
+}
+
+impl<'a> NameList<'a> {
+    pub fn push(&mut self, name: Name<'a>) {
+        self.names.push(name);
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Block<'a> {
-    statements: Vec<Statement<'a>>,
+    pub statements: Vec<Statement<'a>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -75,7 +126,7 @@ pub enum Expression<'a> {
         args: Vec<Expression<'a>>,
         block: Block<'a>,
     },
-    Variable(Variable),
+    Variable(Variable<'a>),
     FunctionCall {
         expression: Box<Expression<'a>>,
         args: Vec<Expression<'a>>,
@@ -187,7 +238,15 @@ pub enum Expression<'a> {
 pub struct Number;
 
 #[derive(Debug, PartialEq)]
-pub struct Variable;
+pub struct Variable<'a> {
+    identifier: &'a str,
+}
+
+impl<'a> Variable<'a> {
+    pub fn new(identifier: &'a str) -> Variable<'a> {
+        Variable { identifier }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Table;

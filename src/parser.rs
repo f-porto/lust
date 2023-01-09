@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Block, Expression, Statement},
+    ast::{Block, Expression, Statement, Variable},
     error::LustError,
     lexer::Lexer,
     token::Token,
@@ -32,8 +32,8 @@ impl<'a> Parser<'a> {
         Ok(token?)
     }
 
-    fn parse_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        let statement = match self.next_token()? {
+    fn parse_statement(&mut self, token: Token) -> Result<Statement<'a>, LustError> {
+        let statement = match token {
             Token::Semicolon => Statement::Nothing,
             Token::Break => Statement::Break,
             Token::DoubleColon => self.parse_label_statement()?,
@@ -43,10 +43,35 @@ impl<'a> Parser<'a> {
             Token::Repeat => self.parse_repeat_statement()?,
             Token::If => self.parse_if_statement()?,
             Token::For => self.parse_for_statement()?,
+            Token::Function => self.parse_function_statement()?,
+            Token::Local => unimplemented!("That local stuff"),
             token => unimplemented!("Probably not implemented yet: {:?}", token),
         };
 
         Ok(statement)
+    }
+
+    fn parse_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Identifier(identifier));
+        expect!(self, Token::LeftParenthesis);
+
+        let mut args = Vec::new();
+        loop {
+            match self.next_token()? {
+                Token::RightParenthesis => break,
+                Token::Identifier(identifier) => args.push(Expression::Variable(Variable {})),
+                Token::TripleDot => {
+                    args.push(Expression::VarArgs);
+                    break;
+                }
+                token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
+            };
+        }
+
+        Ok(Statement::FunctionDecl {
+            expression: Expression::Variable(Variable {}),
+            args,
+        })
     }
 
     fn parse_for_statement(&mut self) -> Result<Statement<'a>, LustError> {
@@ -83,7 +108,7 @@ impl<'a> Parser<'a> {
             limit,
             step,
             block,
-            var: todo!("variables"),
+            var: Expression::Variable(Variable {}),
         })
     }
 
@@ -92,6 +117,9 @@ impl<'a> Parser<'a> {
         first: &'a str,
         vars_done: bool,
     ) -> Result<Statement<'a>, LustError> {
+        let mut vars = Vec::new();
+
+        vars.push(Expression::Variable(Variable {}));
         if !vars_done {
             loop {
                 match self.next_token()? {
@@ -100,7 +128,8 @@ impl<'a> Parser<'a> {
                     token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
                 };
 
-                todo!("variables aaaaaaaaaaaaa")
+                expect!(self, Token::Identifier(identifier));
+                vars.push(Expression::Variable(Variable {}));
             }
         }
 
@@ -120,7 +149,7 @@ impl<'a> Parser<'a> {
         expect!(self, Token::End);
 
         Ok(Statement::GenericFor {
-            vars: todo!("variables mah guy"),
+            vars,
             exprs: expressions,
             block,
         })
@@ -186,7 +215,61 @@ impl<'a> Parser<'a> {
         todo!("Parse deez blocks")
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, LustError> {
+    fn parse_expression(&mut self) -> Result<Expression<'a>, LustError> {
         todo!("Parse deez expressions")
+    }
+}
+
+impl<'a> Iterator for Parser<'a> {
+    type Item = Result<Statement<'a>, LustError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = match self.lexer.next()? {
+            Ok(token) => token,
+            Err(why) => return Some(Err(why)),
+        };
+
+        Some(self.parse_statement(token))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn compare(code: &str, expected_statements: &[Statement]) -> Result<(), LustError> {
+        let mut parser = Parser::new(Lexer::new(code));
+
+        for (i, expected_statement) in expected_statements.into_iter().enumerate() {
+            let Some(actual_statement) = parser.next() else {
+                panic!("{i}: Expected {expected_statement:?} but got nothing");
+            };
+
+            assert_eq!((i, &actual_statement?), (i, expected_statement))
+        }
+        assert_eq!(parser.next(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn simple_statements() -> Result<(), LustError> {
+        compare(";", &[Statement::Nothing])?;
+        compare(
+            "::label::",
+            &[Statement::Label {
+                identifier: "label",
+            }],
+        )?;
+        compare(
+            "goto label",
+            &[Statement::Goto {
+                identifier: "label",
+            }],
+        )?;
+        compare("break", &[Statement::Break])?;
+
+        Ok(())
     }
 }

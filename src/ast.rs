@@ -33,14 +33,14 @@ pub enum Statement<'a> {
         alternative: Box<Option<Statement<'a>>>,
     },
     NumericFor {
-        var: Name<'a>,
+        name: Name<'a>,
         start: Expression<'a>,
         limit: Expression<'a>,
         step: Option<Expression<'a>>,
         block: Block<'a>,
     },
     GenericFor {
-        vars: NameList<'a>,
+        names: NameList<'a>,
         exprs: Vec<Expression<'a>>,
         block: Block<'a>,
     },

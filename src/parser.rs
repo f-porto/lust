@@ -27,8 +27,8 @@ macro_rules! expect {
 macro_rules! is_next {
     ($self:ident, $token:pat_param) => {
         match $self.peek_token()? {
-            pat_param => {
-                $self.next_token();
+            $token => {
+                $self.next_token()?; // This fucking stupid warning
                 true
             }
             _ => false,
@@ -88,86 +88,18 @@ impl<'a> Parser<'a> {
         loop {
             let name = self.parse_name()?;
             names.push(name);
-            match self.peek_token()? {
-                Token::Comma => {
-                    self.next_token();
+            #[allow(unused_must_use)]
+            {
+                if !is_next!(self, Token::Comma) {
+                    break;
                 }
-                _ => break,
             }
         }
 
         Ok(names)
     }
 
-    fn parse_attribute(&mut self) -> Result<Attribute<'a>, LustError> {
-        expect!(self, Token::Identifier(name));
-        let attr = if is_next!(self, Token::LessThan) {
-            expect!(self, Token::Identifier(name));
-            Some(name)
-        } else {
-            None
-        };
-
-        Ok(Attribute {
-            name: Name { name },
-            attr: attr.map(|name| Name { name }),
-        })
-    }
-
-    fn parse_function_name(&mut self) -> Result<FunctionName<'a>, LustError> {
-        Ok(FunctionName {
-            name: self.parse_name()?,
-        })
-    }
-
-    fn parse_local_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        let first = match self.peek_token()? {
-            Token::Function => return self.parse_function_statement(),
-            Token::Identifier(_) => self.parse_attribute()?,
-            token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
-        };
-
-        let mut attrs = AttributeList {
-            attributes: Vec::new(),
-        };
-        attrs.push(first);
-        loop {
-            match self.peek_token()? {
-                Token::Comma => {
-                    self.next_token();
-                }
-                Token::Assign => {
-                    self.next_token();
-                    break;
-                }
-                _ => {
-                    return Ok(Statement::LocalAttrs {
-                        attrs,
-                        expressions: Vec::new(),
-                    })
-                }
-            };
-        }
-
-        let mut expressions = Vec::new();
-        loop {
-            let expr = self.parse_expression()?;
-            expressions.push(expr);
-            match self.peek_token()? {
-                Token::Comma => {
-                    self.next_token();
-                }
-                _ => break,
-            }
-        }
-
-        Ok(Statement::LocalAttrs { attrs, expressions })
-    }
-
-    fn parse_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        let function_name = self.parse_function_name()?;
-        expect!(self, Token::LeftParenthesis);
-
+    fn parse_parameter_list(&mut self) -> Result<ParameterList<'a>, LustError> {
         let mut parameters = ParameterList {
             parameters: NameList { names: Vec::new() },
             var_args: None,
@@ -184,6 +116,67 @@ impl<'a> Parser<'a> {
             };
         }
 
+        Ok(parameters)
+    }
+
+    fn parse_attribute(&mut self) -> Result<Attribute<'a>, LustError> {
+        expect!(self, Token::Identifier(name));
+        let attr = if is_next!(self, Token::LessThan) {
+            expect!(self, Token::Identifier(name));
+            expect!(self, Token::GreaterThan);
+            Some(name)
+        } else {
+            None
+        };
+
+        Ok(Attribute {
+            name: Name { name },
+            attr: attr.map(|name| Name { name }),
+        })
+    }
+
+    fn parse_attribute_list(&mut self) -> Result<AttributeList<'a>, LustError> {
+        let mut attrs = AttributeList {
+            attributes: Vec::new(),
+        };
+        loop {
+            let attr = self.parse_attribute()?;
+            attrs.push(attr);
+            #[allow(unused_must_use)]
+            {
+                if !is_next!(self, Token::Comma) {
+                    break;
+                }
+            };
+        }
+
+        Ok(attrs)
+    }
+
+    fn parse_function_name(&mut self) -> Result<FunctionName<'a>, LustError> {
+        // TODO: This is not right yet
+        Ok(FunctionName {
+            name: self.parse_name()?,
+        })
+    }
+
+    fn parse_local_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        let attrs = match self.peek_token()? {
+            Token::Function => return self.parse_function_statement(),
+            Token::Identifier(_) => self.parse_attribute_list()?,
+            token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
+        };
+
+        let expressions = self.parse_expression_list()?;
+
+        Ok(Statement::LocalAttrs { attrs, expressions })
+    }
+
+    fn parse_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        let function_name = self.parse_function_name()?;
+        expect!(self, Token::LeftParenthesis);
+        let parameters = self.parse_parameter_list()?;
+        expect!(self, Token::RightParenthesis);
         let block = self.parse_block()?;
         expect!(self, Token::End);
 
@@ -195,17 +188,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_for_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Identifier(identifier));
+        let mut names = self.parse_name_list()?;
 
         match self.next_token()? {
-            Token::Assign => self.parse_numeric_for(identifier),
-            Token::Comma => self.parse_generic_for(identifier, false),
-            Token::In => self.parse_generic_for(identifier, true),
+            Token::Assign => self.parse_numeric_for(names.names.pop().expect("This sucks")), // TODO: This sucks, do better
+            Token::In => self.parse_generic_for(names),
             token => Err(LustError::UnexpectedToken(format!("{:?}", token))),
         }
     }
 
-    fn parse_numeric_for(&mut self, first: &'a str) -> Result<Statement<'a>, LustError> {
+    fn parse_numeric_for(&mut self, name: Name<'a>) -> Result<Statement<'a>, LustError> {
         let start = self.parse_expression()?;
         expect!(self, Token::Comma);
         let limit = self.parse_expression()?;
@@ -228,31 +220,11 @@ impl<'a> Parser<'a> {
             limit,
             step,
             block,
-            var: Name { name: first },
+            name,
         })
     }
 
-    fn parse_generic_for(
-        &mut self,
-        first: &'a str,
-        vars_done: bool,
-    ) -> Result<Statement<'a>, LustError> {
-        let mut vars = NameList { names: Vec::new() };
-
-        vars.push(Name { name: first });
-        if !vars_done {
-            loop {
-                match self.next_token()? {
-                    Token::Comma => {}
-                    Token::In => break,
-                    token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
-                };
-
-                expect!(self, Token::Identifier(name));
-                vars.push(Name { name });
-            }
-        }
-
+    fn parse_generic_for(&mut self, names: NameList<'a>) -> Result<Statement<'a>, LustError> {
         let mut expressions = Vec::new();
         loop {
             let expression = self.parse_expression()?;
@@ -269,7 +241,7 @@ impl<'a> Parser<'a> {
         expect!(self, Token::End);
 
         Ok(Statement::GenericFor {
-            vars,
+            names,
             exprs: expressions,
             block,
         })
@@ -341,6 +313,21 @@ impl<'a> Parser<'a> {
 
     fn parse_expression(&mut self) -> Result<Expression<'a>, LustError> {
         todo!("Parse deez expressions")
+    }
+
+    fn parse_expression_list(&mut self) -> Result<Vec<Expression<'a>>, LustError> {
+        let mut exprs = Vec::new();
+
+        loop {
+            let expr = self.parse_expression()?;
+            exprs.push(expr);
+
+            if is_next!(self, Token::Comma) {
+                break;
+            }
+        }
+
+        Ok(exprs)
     }
 }
 

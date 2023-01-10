@@ -3,6 +3,7 @@ use std::{
     fmt::{Display, Formatter, Result},
 };
 
+// TODO: Those are terrible errors, make it good
 #[derive(Debug, Clone, PartialEq)]
 pub enum LustError {
     UnexpectedChar(char),
@@ -12,6 +13,7 @@ pub enum LustError {
 
     NothingToParse,
     UnexpectedToken(String),
+    NotAStatement,
 }
 
 impl Display for LustError {
@@ -23,6 +25,7 @@ impl Display for LustError {
             Self::MalformedNumber => write!(f, "Malformed number"),
             Self::NothingToParse => write!(f, "Nothing to parse"),
             Self::UnexpectedToken(token) => write!(f, "Unexpected token: {}", token),
+            Self::NotAStatement => write!(f, "Not a statement"),
         }
     }
 }

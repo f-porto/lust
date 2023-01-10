@@ -20,7 +20,7 @@ impl<'a> Lexer<'a> {
 
     fn read_quoted_string(&mut self, start: usize, quote: char) -> Result<&'a str, LustError> {
         let mut escaped = false;
-        while let Some(char) = self.chars.next() {
+        for char in self.chars.by_ref() {
             match char {
                 (_, '\\') => escaped = !escaped,
                 (end, char) if char == quote => {
@@ -43,9 +43,8 @@ impl<'a> Lexer<'a> {
             equals += 1;
         }
 
-        let start;
-        match self.chars.next() {
-            Some((pos, '[')) => start = pos + 1,
+        let start = match self.chars.next() {
+            Some((pos, '[')) => pos + 1,
             Some((_, char)) => return Err(LustError::UnexpectedChar(char)),
             None => return Err(LustError::MissingCharacter),
         };
@@ -106,11 +105,8 @@ impl<'a> Lexer<'a> {
             };
         }
 
-        match self.chars.peek() {
-            Some((_, '-' | '+')) => {
-                self.chars.next();
-            }
-            _ => {}
+        if let Some((_, '-' | '+')) = self.chars.peek() {
+            self.chars.next();
         };
 
         let mut end;
@@ -159,11 +155,8 @@ impl<'a> Lexer<'a> {
             };
         }
 
-        match self.chars.peek() {
-            Some((_, '-' | '+')) => {
-                self.chars.next();
-            }
-            _ => {}
+        if let Some((_, '-' | '+')) = self.chars.peek() {
+            self.chars.next();
         };
 
         let mut end;
@@ -206,7 +199,7 @@ impl<'a> Lexer<'a> {
             Some((_, '\n')) => return,
             _ => {}
         }
-        while let Some((_, char)) = self.chars.next() {
+        for (_, char) in self.chars.by_ref() {
             if char == '\n' {
                 break;
             }
@@ -215,7 +208,7 @@ impl<'a> Lexer<'a> {
 
     fn skip_block_comment(&mut self) {
         let mut end_brackets = 0;
-        while let Some((_, char)) = self.chars.next() {
+        for (_, char) in self.chars.by_ref() {
             if char == ']' {
                 end_brackets += 1;
             } else {
@@ -242,21 +235,15 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
 
-        loop {
-            match self.chars.peek() {
-                Some((_, '-')) => {
-                    self.chars.next();
-                    match self.chars.peek() {
-                        Some((_, '-')) => {
-                            self.chars.next();
-                            self.skip_line_comment();
-                        }
-                        _ => return Some(Ok(Token::Minus)),
-                    }
-                }
-                _ => break,
-            };
-            self.skip_whitespace();
+        while let Some((_, '-')) = self.chars.peek() {
+            self.chars.next();
+            if let Some((_, '-')) = self.chars.peek() {
+                self.chars.next();
+                self.skip_line_comment();
+                self.skip_whitespace();
+            } else {
+                return Some(Ok(Token::Minus));
+            }
         }
 
         let token = match self.chars.next()? {

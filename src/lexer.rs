@@ -288,9 +288,9 @@ impl<'a> Iterator for Lexer<'a> {
             (_, '/') => match self.chars.peek() {
                 Some((_, '/')) => {
                     self.chars.next();
-                    Token::DoubleBackSlash
+                    Token::DoubleSlash
                 }
-                _ => Token::BackSlash,
+                _ => Token::Slash,
             },
             (_, '~') => match self.chars.peek() {
                 Some((_, '=')) => {
@@ -486,7 +486,7 @@ mod tests {
         let expected_tokens = [
             Token::Plus,
             Token::Minus,
-            Token::BackSlash,
+            Token::Slash,
             Token::Asterisk,
             Token::Circumflex,
             Token::Percent,
@@ -525,7 +525,7 @@ mod tests {
             Token::GreaterThanOrEqual,
             Token::DoubleDot,
             Token::DoubleColon,
-            Token::DoubleBackSlash,
+            Token::DoubleSlash,
         ];
 
         compare(&code, &expected_tokens)

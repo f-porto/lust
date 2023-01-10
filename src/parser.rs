@@ -26,11 +26,9 @@ macro_rules! expect {
 
 macro_rules! is_next {
     ($self:ident, $token:pat_param) => {
-        match $self.peek_token()? {
-            $token => {
-                $self.next_token()?; // This fucking stupid warning
-                true
-            }
+        match $self.lexer.peek() {
+            Some(Ok($token)) => true,
+            Some(Err(why)) => return Err(why.clone()),
             _ => false,
         }
     };
@@ -86,11 +84,11 @@ impl<'a> Parser<'a> {
         loop {
             let name = self.parse_name()?;
             names.push(name);
-            match self.lexer.peek() {
-                Some(Ok(Token::Comma)) => self.lexer.next(),
-                Some(Err(why)) => return Err(why.clone()),
-                _ => break,
-            };
+            if is_next!(self, Token::Comma) {
+                expect!(self, Token::Comma);
+            } else {
+                break;
+            }
         }
 
         Ok(names)
@@ -115,11 +113,11 @@ impl<'a> Parser<'a> {
                 }
                 _ => break,
             }
-            match self.lexer.peek() {
-                Some(Ok(Token::Comma)) => self.lexer.next(),
-                Some(Err(why)) => return Err(why.clone()),
-                _ => break,
-            };
+            if is_next!(self, Token::Comma) {
+                expect!(self, Token::Comma);
+            } else {
+                break;
+            }
         }
 
         Ok(parameters)
@@ -127,12 +125,7 @@ impl<'a> Parser<'a> {
 
     fn parse_attribute(&mut self) -> Result<Attribute<'a>, LustError> {
         let name = self.parse_name()?;
-        let has_attr = match self.lexer.peek() {
-            Some(Ok(Token::LessThan)) => true,
-            Some(Err(why)) => return Err(why.clone()),
-            _ => false,
-        };
-        let attr = if has_attr {
+        let attr = if is_next!(self, Token::LessThan) {
             expect!(self, Token::LessThan);
             let name = self.parse_name()?;
             expect!(self, Token::GreaterThan);
@@ -150,11 +143,11 @@ impl<'a> Parser<'a> {
         loop {
             let attr = self.parse_attribute()?;
             attrs.push(attr);
-            match self.lexer.peek() {
-                Some(Ok(Token::Comma)) => self.lexer.next(),
-                Some(Err(why)) => return Err(why.clone()),
-                _ => break,
-            };
+            if is_next!(self, Token::Comma) {
+                expect!(self, Token::Comma);
+            } else {
+                break;
+            }
         }
         Ok(attrs)
     }
@@ -184,12 +177,7 @@ impl<'a> Parser<'a> {
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
-        let has_expr = match self.lexer.peek() {
-            Some(Ok(Token::Assign)) => true,
-            Some(Err(why)) => return Err(why.clone()),
-            _ => false,
-        };
-        let expressions = if has_expr {
+        let expressions = if is_next!(self, Token::Assign) {
             self.parse_expression_list()?
         } else {
             Vec::new()
@@ -234,7 +222,12 @@ impl<'a> Parser<'a> {
         let mut names = self.parse_name_list()?;
 
         match self.next_token()? {
-            Token::Assign => self.parse_numeric_for(names.names.pop().expect("This sucks")), // TODO: This sucks, do better
+            token @ Token::Assign => if names.names.len() == 1 {
+                let name = names.names.pop().expect("Should always work");
+                self.parse_numeric_for(name)
+            } else {
+                Err(LustError::UnexpectedToken(format!("{:?}", token)))
+            }
             Token::In => self.parse_generic_for(names),
             token => Err(LustError::UnexpectedToken(format!("{:?}", token))),
         }
@@ -290,15 +283,52 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_if_statement(&mut self) -> Result<Statement<'a>, LustError> {
+    fn parse_else_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Else);
+        let block = self.parse_block()?;
+        expect!(self, Token::End);
+
+        Ok(Statement::Else { block })
+    }
+
+    fn parse_else_if_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Elseif);
         let condition = self.parse_expression()?;
         expect!(self, Token::Then);
         let block = self.parse_block()?;
 
-        let alternative = match self.next_token()? {
-            Token::End => None,
-            Token::Elseif => Some(Box::new(self.parse_if_statement()?)),
-            Token::Else => Some(Box::new(self.parse_do_statement()?)), // TODO: Find a better way, c'mon
+        #[allow(unused_must_use)]
+        let alternative = match self.peek_token()? {
+            Token::End => {
+                self.next_token();
+                None
+            }
+            Token::Elseif => Some(Box::new(self.parse_else_if_statement()?)),
+            Token::Else => Some(Box::new(self.parse_else_statement()?)),
+            token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
+        };
+
+        Ok(Statement::ElseIf {
+            condition,
+            consequence: block,
+            alternative,
+        })
+    }
+
+    fn parse_if_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::If);
+        let condition = self.parse_expression()?;
+        expect!(self, Token::Then);
+        let block = self.parse_block()?;
+        
+        #[allow(unused_must_use)]
+        let alternative = match self.peek_token()? {
+            Token::End => {
+                self.next_token();
+                None
+            }
+            Token::Elseif => Some(Box::new(self.parse_else_if_statement()?)),
+            Token::Else => Some(Box::new(self.parse_else_statement()?)),
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
@@ -354,8 +384,9 @@ impl<'a> Parser<'a> {
 
     fn try_parse_return_statement(&mut self) -> Result<Option<Statement<'a>>, LustError> {
         if is_next!(self, Token::Return) {
+            expect!(self, Token::Return);
             let exprs = self.parse_expression_list()?;
-            is_next!(self, Token::Semicolon);
+            expect!(self, Token::Semicolon);
             Ok(Some(Statement::Return { exprs }))
         } else {
             Ok(None)
@@ -398,6 +429,7 @@ impl<'a> Parser<'a> {
             exprs.push(expr);
 
             if is_next!(self, Token::Comma) {
+                expect!(self, Token::Comma);
                 break;
             }
         }

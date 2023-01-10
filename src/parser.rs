@@ -86,9 +86,11 @@ impl<'a> Parser<'a> {
         loop {
             let name = self.parse_name()?;
             names.push(name);
-            if !is_next!(self, Token::Comma) {
-                break;
-            }
+            match self.lexer.peek() {
+                Some(Ok(Token::Comma)) => self.lexer.next(),
+                Some(Err(why)) => return Err(why.clone()),
+                _ => break,
+            };
         }
 
         Ok(names)
@@ -99,15 +101,24 @@ impl<'a> Parser<'a> {
             parameters: NameList { names: Vec::new() },
             var_args: None,
         };
+        #[allow(unused_must_use)]
         loop {
-            match self.next_token()? {
-                Token::RightParenthesis => break,
-                Token::Identifier(name) => parameters.push(Name { name }),
+            match self.peek_token()? {
+                Token::Identifier(name) => {
+                    parameters.push(Name { name });
+                    self.next_token();
+                }
                 Token::TripleDot => {
+                    self.next_token();
                     parameters.var_args = Some(Expression::VarArgs);
                     break;
                 }
-                token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
+                _ => break,
+            }
+            match self.lexer.peek() {
+                Some(Ok(Token::Comma)) => self.lexer.next(),
+                Some(Err(why)) => return Err(why.clone()),
+                _ => break,
             };
         }
 
@@ -115,19 +126,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_attribute(&mut self) -> Result<Attribute<'a>, LustError> {
-        expect!(self, Token::Identifier(name));
-        let attr = if is_next!(self, Token::LessThan) {
-            expect!(self, Token::Identifier(name));
+        let name = self.parse_name()?;
+        let has_attr = match self.lexer.peek() {
+            Some(Ok(Token::LessThan)) => true,
+            Some(Err(why)) => return Err(why.clone()),
+            _ => false,
+        };
+        let attr = if has_attr {
+            expect!(self, Token::LessThan);
+            let name = self.parse_name()?;
             expect!(self, Token::GreaterThan);
             Some(name)
         } else {
             None
         };
-
-        Ok(Attribute {
-            name: Name { name },
-            attr: attr.map(|name| Name { name }),
-        })
+        Ok(Attribute { name, attr })
     }
 
     fn parse_attribute_list(&mut self) -> Result<AttributeList<'a>, LustError> {
@@ -137,11 +150,12 @@ impl<'a> Parser<'a> {
         loop {
             let attr = self.parse_attribute()?;
             attrs.push(attr);
-            if !is_next!(self, Token::Comma) {
-                break;
-            }
+            match self.lexer.peek() {
+                Some(Ok(Token::Comma)) => self.lexer.next(),
+                Some(Err(why)) => return Err(why.clone()),
+                _ => break,
+            };
         }
-
         Ok(attrs)
     }
 
@@ -163,18 +177,29 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_local_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Local);
         let attrs = match self.peek_token()? {
             Token::Function => return self.parse_local_function_statement(),
             Token::Identifier(_) => self.parse_attribute_list()?,
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
-        let expressions = self.parse_expression_list()?;
+        let has_expr = match self.lexer.peek() {
+            Some(Ok(Token::Assign)) => true,
+            Some(Err(why)) => return Err(why.clone()),
+            _ => false,
+        };
+        let expressions = if has_expr {
+            self.parse_expression_list()?
+        } else {
+            Vec::new()
+        };
 
         Ok(Statement::LocalAttrs { attrs, expressions })
     }
 
     fn parse_local_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Function);
         let name = self.parse_name()?;
         expect!(self, Token::LeftParenthesis);
         let parameters = self.parse_parameter_list()?;
@@ -190,6 +215,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Function);
         let function_name = self.parse_function_name()?;
         expect!(self, Token::LeftParenthesis);
         let parameters = self.parse_parameter_list()?;
@@ -354,7 +380,10 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(Block { statements, return_statement })
+        Ok(Block {
+            statements,
+            return_statement,
+        })
     }
 
     fn parse_expression(&mut self) -> Result<Expression<'a>, LustError> {
@@ -409,17 +438,217 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn empty_function() -> Result<(), LustError> {
-    //     compare(
-    //         "function fn() end",
-    //         &[Statement::FunctionDecl {
-    //             expression: Expression::Variable(Variable::new("fn")),
-    //             args: Vec::new(),
-    //             block: Block { statements: Vec::new() },
-    //         }],
-    //     )
-    // }
+    #[test]
+    fn local_attributes() -> Result<(), LustError> {
+        compare(
+            "local attr1, attr<ya>, trash_code",
+            &[Statement::LocalAttrs {
+                attrs: AttributeList {
+                    attributes: vec![
+                        Attribute {
+                            name: Name { name: "attr1" },
+                            attr: None,
+                        },
+                        Attribute {
+                            name: Name { name: "attr" },
+                            attr: Some(Name { name: "ya" }),
+                        },
+                        Attribute {
+                            name: Name { name: "trash_code" },
+                            attr: None,
+                        },
+                    ],
+                },
+                expressions: Vec::new(),
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_local_function() -> Result<(), LustError> {
+        compare(
+            "local function local_fn() end",
+            &[Statement::LocalFunctionDecl {
+                name: Name { name: "local_fn" },
+                parameters: ParameterList {
+                    parameters: NameList { names: Vec::new() },
+                    var_args: None,
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_local_function_with_args() -> Result<(), LustError> {
+        compare(
+            "local function this_is_local(give, me, parameters) end",
+            &[Statement::LocalFunctionDecl {
+                name: Name {
+                    name: "this_is_local",
+                },
+                parameters: ParameterList {
+                    parameters: NameList {
+                        names: vec![
+                            Name { name: "give" },
+                            Name { name: "me" },
+                            Name { name: "parameters" },
+                        ],
+                    },
+                    var_args: None,
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_local_function_var_args() -> Result<(), LustError> {
+        compare(
+            "local function put_everything_in_me_but_locally(...) end",
+            &[Statement::LocalFunctionDecl {
+                name: Name {
+                    name: "put_everything_in_me_but_locally",
+                },
+                parameters: ParameterList {
+                    parameters: NameList { names: Vec::new() },
+                    var_args: Some(Expression::VarArgs),
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_local_function_with_args_and_var_args() -> Result<(), LustError> {
+        compare(
+            "local function the_famous_do_stuff_function(what, is, this, supposed, ...) end",
+            &[Statement::LocalFunctionDecl {
+                name: Name {
+                    name: "the_famous_do_stuff_function",
+                },
+                parameters: ParameterList {
+                    parameters: NameList {
+                        names: vec![
+                            Name { name: "what" },
+                            Name { name: "is" },
+                            Name { name: "this" },
+                            Name { name: "supposed" },
+                        ],
+                    },
+                    var_args: Some(Expression::VarArgs),
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_function() -> Result<(), LustError> {
+        compare(
+            "function fn() end",
+            &[Statement::FunctionDecl {
+                name: FunctionName {
+                    name: Name { name: "fn" },
+                },
+                parameters: ParameterList {
+                    parameters: NameList { names: Vec::new() },
+                    var_args: None,
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_function_with_args() -> Result<(), LustError> {
+        compare(
+            "function my_beautiful_10th_function(a, bc, DEF, a_b_c) end",
+            &[Statement::FunctionDecl {
+                name: FunctionName {
+                    name: Name {
+                        name: "my_beautiful_10th_function",
+                    },
+                },
+                parameters: ParameterList {
+                    parameters: NameList {
+                        names: vec![
+                            Name { name: "a" },
+                            Name { name: "bc" },
+                            Name { name: "DEF" },
+                            Name { name: "a_b_c" },
+                        ],
+                    },
+                    var_args: None,
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_function_var_args() -> Result<(), LustError> {
+        compare(
+            "function put_everything_in_me(...) end",
+            &[Statement::FunctionDecl {
+                name: FunctionName {
+                    name: Name {
+                        name: "put_everything_in_me",
+                    },
+                },
+                parameters: ParameterList {
+                    parameters: NameList { names: Vec::new() },
+                    var_args: Some(Expression::VarArgs),
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn empty_function_with_args_and_var_args() -> Result<(), LustError> {
+        compare(
+            "function give_your_things(anil, falsy, ...) end",
+            &[Statement::FunctionDecl {
+                name: FunctionName {
+                    name: Name {
+                        name: "give_your_things",
+                    },
+                },
+                parameters: ParameterList {
+                    parameters: NameList {
+                        names: vec![Name { name: "anil" }, Name { name: "falsy" }],
+                    },
+                    var_args: Some(Expression::VarArgs),
+                },
+                block: Block {
+                    statements: Vec::new(),
+                    return_statement: None,
+                },
+            }],
+        )
+    }
 
     #[test]
     fn simple_statements() -> Result<(), LustError> {

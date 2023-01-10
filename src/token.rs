@@ -36,7 +36,7 @@ pub enum Token<'a> {
     Plus,
     Minus,
     Asterisk,
-    BackSlash,
+    Slash,
     Percent,
 
     Circumflex,
@@ -48,7 +48,7 @@ pub enum Token<'a> {
     LeftShift,
     RightShift,
 
-    DoubleBackSlash,
+    DoubleSlash,
 
     Equals,
     Different,

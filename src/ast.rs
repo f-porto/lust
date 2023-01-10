@@ -51,7 +51,8 @@ pub enum Statement<'a> {
     },
     LocalFunctionDecl {
         name: Name<'a>,
-        args: ParameterList<'a>,
+        parameters: ParameterList<'a>,
+        block: Block<'a>,
     },
     LocalAttrs {
         attrs: AttributeList<'a>,

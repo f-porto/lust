@@ -164,7 +164,7 @@ impl<'a> Parser<'a> {
 
     fn parse_local_statement(&mut self) -> Result<Statement<'a>, LustError> {
         let attrs = match self.peek_token()? {
-            Token::Function => return self.parse_function_statement(),
+            Token::Function => return self.parse_local_function_statement(),
             Token::Identifier(_) => self.parse_attribute_list()?,
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
@@ -172,6 +172,21 @@ impl<'a> Parser<'a> {
         let expressions = self.parse_expression_list()?;
 
         Ok(Statement::LocalAttrs { attrs, expressions })
+    }
+
+    fn parse_local_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        let name = self.parse_name()?;
+        expect!(self, Token::LeftParenthesis);
+        let parameters = self.parse_parameter_list()?;
+        expect!(self, Token::RightParenthesis);
+        let block = self.parse_block()?;
+        expect!(self, Token::End);
+
+        Ok(Statement::LocalFunctionDecl {
+            name,
+            parameters,
+            block,
+        })
     }
 
     fn parse_function_statement(&mut self) -> Result<Statement<'a>, LustError> {

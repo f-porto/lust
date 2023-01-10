@@ -32,6 +32,14 @@ pub enum Statement<'a> {
         consequence: Block<'a>,
         alternative: Option<Box<Statement<'a>>>,
     },
+    ElseIf {
+        condition: Expression<'a>,
+        consequence: Block<'a>,
+        alternative: Option<Box<Statement<'a>>>,
+    },
+    Else {
+        block: Block<'a>,
+    },
     NumericFor {
         name: Name<'a>,
         start: Expression<'a>,

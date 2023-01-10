@@ -14,6 +14,8 @@ pub enum LustError {
     NothingToParse,
     UnexpectedToken(String),
     NotAStatement,
+
+    ExpectedButGotNothing(String),
 }
 
 impl Display for LustError {
@@ -26,6 +28,7 @@ impl Display for LustError {
             Self::NothingToParse => write!(f, "Nothing to parse"),
             Self::UnexpectedToken(token) => write!(f, "Unexpected token: {}", token),
             Self::NotAStatement => write!(f, "Not a statement"),
+            Self::ExpectedButGotNothing(msg) => write!(f, "Expected `{}` but got nothing", msg),
         }
     }
 }

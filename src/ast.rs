@@ -67,7 +67,7 @@ pub enum Statement<'a> {
         expressions: Vec<Expression<'a>>,
     },
     Return {
-        exprs: Vec<Expression<'a>>,
+        exprs: Option<Vec<Expression<'a>>>,
     },
 }
 
@@ -247,6 +247,7 @@ pub enum Expression<'a> {
     },
 }
 
+// TODO: make the table
 #[derive(Debug, PartialEq)]
 pub struct Number;
 
@@ -261,5 +262,6 @@ impl<'a> Variable<'a> {
     }
 }
 
+// TODO: make the table
 #[derive(Debug, PartialEq)]
 pub struct Table;

@@ -222,11 +222,13 @@ impl<'a> Parser<'a> {
         let mut names = self.parse_name_list()?;
 
         match self.next_token()? {
-            token @ Token::Assign => if names.names.len() == 1 {
-                let name = names.names.pop().expect("Should always work");
-                self.parse_numeric_for(name)
-            } else {
-                Err(LustError::UnexpectedToken(format!("{:?}", token)))
+            token @ Token::Assign => {
+                if names.names.len() == 1 {
+                    let name = names.names.pop().expect("Should always work");
+                    self.parse_numeric_for(name)
+                } else {
+                    Err(LustError::UnexpectedToken(format!("{:?}", token)))
+                }
             }
             Token::In => self.parse_generic_for(names),
             token => Err(LustError::UnexpectedToken(format!("{:?}", token))),
@@ -320,7 +322,7 @@ impl<'a> Parser<'a> {
         let condition = self.parse_expression()?;
         expect!(self, Token::Then);
         let block = self.parse_block()?;
-        
+
         #[allow(unused_must_use)]
         let alternative = match self.peek_token()? {
             Token::End => {
@@ -385,8 +387,13 @@ impl<'a> Parser<'a> {
     fn try_parse_return_statement(&mut self) -> Result<Option<Statement<'a>>, LustError> {
         if is_next!(self, Token::Return) {
             expect!(self, Token::Return);
-            let exprs = self.parse_expression_list()?;
-            expect!(self, Token::Semicolon);
+            let exprs = match self.parse_expression_list() {
+                Ok(exprs) => Some(exprs),
+                Err(why) => return Err(why), // FIXME: expressions are optional
+            };
+            if is_next!(self, Token::Semicolon) {
+                expect!(self, Token::Semicolon);
+            }
             Ok(Some(Statement::Return { exprs }))
         } else {
             Ok(None)
@@ -418,7 +425,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<Expression<'a>, LustError> {
-        todo!("Parse deez expressions")
+        todo!("calm down")
     }
 
     fn parse_expression_list(&mut self) -> Result<Vec<Expression<'a>>, LustError> {

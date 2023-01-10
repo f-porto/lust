@@ -302,7 +302,9 @@ impl<'a> TokenNode<'a> {
             },
             Self::Nullary { value, .. } => match value {
                 Token::Number(number) => Expression::Number(Number {}),
-                Token::Identifier(ref identifier) => Expression::Variable(Variable::new(identifier)),
+                Token::Identifier(ref identifier) => {
+                    Expression::Variable(Variable::new(identifier))
+                }
                 Token::True => Expression::Bool(true),
                 Token::False => Expression::Bool(false),
                 token => unreachable!("Unreachable right?, {:?}", token),

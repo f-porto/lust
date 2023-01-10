@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use crate::{
     ast::{
         Attribute, AttributeList, Block, Expression, FunctionName, Name, NameList, ParameterList,
-        Statement, Variable,
+        Statement,
     },
     error::LustError,
     lexer::Lexer,
@@ -59,23 +59,21 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_statement(&mut self, token: Token) -> Result<Statement<'a>, LustError> {
-        let statement = match token {
-            Token::Semicolon => Statement::Nothing,
-            Token::Break => Statement::Break,
-            Token::DoubleColon => self.parse_label_statement()?,
-            Token::Goto => self.parse_goto_statement()?,
-            Token::Do => self.parse_do_statement()?,
-            Token::While => self.parse_while_statement()?,
-            Token::Repeat => self.parse_repeat_statement()?,
-            Token::If => self.parse_if_statement()?,
-            Token::For => self.parse_for_statement()?,
-            Token::Function => self.parse_function_statement()?,
-            Token::Local => self.parse_local_statement()?,
-            token => unimplemented!("Probably not implemented yet: {:?}", token),
-        };
-
-        Ok(statement)
+    fn parse_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        match self.peek_token()? {
+            Token::Semicolon => self.parse_nothing_statement(),
+            Token::Break => self.parse_break_statement(),
+            Token::DoubleColon => self.parse_label_statement(),
+            Token::Goto => self.parse_goto_statement(),
+            Token::Do => self.parse_do_statement(),
+            Token::While => self.parse_while_statement(),
+            Token::Repeat => self.parse_repeat_statement(),
+            Token::If => self.parse_if_statement(),
+            Token::For => self.parse_for_statement(),
+            Token::Function => self.parse_function_statement(),
+            Token::Local => self.parse_local_statement(),
+            _ => Err(LustError::NotAStatement),
+        }
     }
 
     fn parse_name(&mut self) -> Result<Name<'a>, LustError> {
@@ -88,11 +86,8 @@ impl<'a> Parser<'a> {
         loop {
             let name = self.parse_name()?;
             names.push(name);
-            #[allow(unused_must_use)]
-            {
-                if !is_next!(self, Token::Comma) {
-                    break;
-                }
+            if !is_next!(self, Token::Comma) {
+                break;
             }
         }
 
@@ -142,12 +137,9 @@ impl<'a> Parser<'a> {
         loop {
             let attr = self.parse_attribute()?;
             attrs.push(attr);
-            #[allow(unused_must_use)]
-            {
-                if !is_next!(self, Token::Comma) {
-                    break;
-                }
-            };
+            if !is_next!(self, Token::Comma) {
+                break;
+            }
         }
 
         Ok(attrs)
@@ -158,6 +150,16 @@ impl<'a> Parser<'a> {
         Ok(FunctionName {
             name: self.parse_name()?,
         })
+    }
+
+    fn parse_nothing_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Semicolon);
+        Ok(Statement::Nothing)
+    }
+
+    fn parse_break_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Break);
+        Ok(Statement::Break)
     }
 
     fn parse_local_statement(&mut self) -> Result<Statement<'a>, LustError> {
@@ -225,10 +227,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_generic_for(&mut self, names: NameList<'a>) -> Result<Statement<'a>, LustError> {
-        let mut expressions = Vec::new();
+        let mut exprs = Vec::new();
         loop {
             let expression = self.parse_expression()?;
-            expressions.push(expression);
+            exprs.push(expression);
 
             match self.next_token()? {
                 Token::Comma => {}
@@ -242,7 +244,7 @@ impl<'a> Parser<'a> {
 
         Ok(Statement::GenericFor {
             names,
-            exprs: expressions,
+            exprs,
             block,
         })
     }
@@ -254,15 +256,15 @@ impl<'a> Parser<'a> {
 
         let alternative = match self.next_token()? {
             Token::End => None,
-            Token::Elseif => Some(self.parse_if_statement()?),
-            Token::Else => Some(self.parse_do_statement()?), // TODO: Find a better way, c'mon
+            Token::Elseif => Some(Box::new(self.parse_if_statement()?)),
+            Token::Else => Some(Box::new(self.parse_do_statement()?)), // TODO: Find a better way, c'mon
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
         Ok(Statement::If {
             condition,
             consequence: block,
-            alternative: Box::new(alternative),
+            alternative,
         })
     }
 
@@ -291,6 +293,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_goto_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::Goto);
         expect!(self, Token::Identifier(name));
 
         Ok(Statement::Goto {
@@ -299,6 +302,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_label_statement(&mut self) -> Result<Statement<'a>, LustError> {
+        expect!(self, Token::DoubleColon);
         expect!(self, Token::Identifier(name));
         expect!(self, Token::DoubleColon);
 
@@ -307,8 +311,35 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn try_parse_return_statement(&mut self) -> Result<Option<Statement<'a>>, LustError> {
+        if is_next!(self, Token::Return) {
+            let exprs = self.parse_expression_list()?;
+            is_next!(self, Token::Semicolon);
+            Ok(Some(Statement::Return { exprs }))
+        } else {
+            Ok(None)
+        }
+    }
+
     fn parse_block(&mut self) -> Result<Block<'a>, LustError> {
-        todo!("Parse deez blocks")
+        let mut statements = Vec::new();
+        let mut return_statement = None;
+
+        loop {
+            match self.parse_statement() {
+                Ok(statement) => statements.push(statement),
+                Err(LustError::NotAStatement) => {
+                    if let Some(ret_stat) = self.try_parse_return_statement()? {
+                        return_statement = Some(Box::new(ret_stat));
+                    }
+                    break;
+                }
+                Err(LustError::NothingToParse) => break,
+                Err(why) => return Err(why),
+            }
+        }
+
+        Ok(Block { statements, return_statement })
     }
 
     fn parse_expression(&mut self) -> Result<Expression<'a>, LustError> {
@@ -335,12 +366,11 @@ impl<'a> Iterator for Parser<'a> {
     type Item = Result<Statement<'a>, LustError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = match self.lexer.next()? {
-            Ok(token) => token,
-            Err(why) => return Some(Err(why)),
-        };
-
-        Some(self.parse_statement(token))
+        if self.lexer.peek().is_some() {
+            Some(self.parse_statement())
+        } else {
+            None
+        }
     }
 }
 

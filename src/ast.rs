@@ -30,7 +30,7 @@ pub enum Statement<'a> {
     If {
         condition: Expression<'a>,
         consequence: Block<'a>,
-        alternative: Box<Option<Statement<'a>>>,
+        alternative: Option<Box<Statement<'a>>>,
     },
     NumericFor {
         name: Name<'a>,
@@ -56,6 +56,9 @@ pub enum Statement<'a> {
     LocalAttrs {
         attrs: AttributeList<'a>,
         expressions: Vec<Expression<'a>>,
+    },
+    Return {
+        exprs: Vec<Expression<'a>>,
     },
 }
 
@@ -112,6 +115,7 @@ impl<'a> NameList<'a> {
 #[derive(Debug, PartialEq)]
 pub struct Block<'a> {
     pub statements: Vec<Statement<'a>>,
+    pub return_statement: Option<Box<Statement<'a>>>,
 }
 
 #[derive(Debug, PartialEq)]

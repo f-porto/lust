@@ -3,11 +3,12 @@ use std::{
     str::Chars,
 };
 
-use crate::{error::LustError, token::Token};
+use crate::{error::LustError, state_machine::{StateMachine, outer::{OuterStateMachine, OuterState}}, token::Token};
 
 pub struct Lexer<'a> {
     code: &'a str,
     chars: Peekable<Enumerate<Chars<'a>>>,
+    state_machine: OuterStateMachine,
 }
 
 impl<'a> Lexer<'a> {
@@ -15,6 +16,7 @@ impl<'a> Lexer<'a> {
         Self {
             code,
             chars: code.chars().enumerate().peekable(),
+            state_machine: OuterStateMachine::new(),
         }
     }
 
@@ -63,66 +65,6 @@ impl<'a> Lexer<'a> {
         }
 
         Err(LustError::UnfinishedString)
-    }
-
-    fn read_number(
-        &mut self,
-        start: usize,
-        started_with_digit: bool,
-    ) -> Result<&'a str, LustError> {
-        if started_with_digit {
-            while let Some((e, char)) = self.chars.peek() {
-                match char {
-                    '0'..='9' => {
-                        self.chars.next();
-                    }
-                    '.' => {
-                        self.chars.next();
-                        break;
-                    }
-                    'e' | 'E' => {
-                        break;
-                    }
-                    _ => return Ok(&self.code[start..*e]),
-                };
-            }
-        } else {
-            let Some((_, '0'..='9')) = self.chars.next() else {
-                return Err(LustError::MalformedNumber);
-            };
-        }
-
-        while let Some((e, char)) = self.chars.peek() {
-            match char {
-                '0'..='9' => {
-                    self.chars.next();
-                }
-                'e' | 'E' => {
-                    self.chars.next();
-                    break;
-                }
-                _ => return Ok(&self.code[start..*e]),
-            };
-        }
-
-        if let Some((_, '-' | '+')) = self.chars.peek() {
-            self.chars.next();
-        };
-
-        let mut end;
-        match self.chars.peek() {
-            Some((e, '0'..='9')) => {
-                end = *e;
-                self.chars.next();
-            }
-            _ => return Err(LustError::MalformedNumber),
-        };
-
-        while let Some((e, _)) = self.chars.next_if(|(_, char)| ('0'..='9').contains(char)) {
-            end = e;
-        }
-
-        Ok(&self.code[start..=end])
     }
 
     fn read_hexadecimal(&mut self, start: usize) -> Result<&'a str, LustError> {
@@ -235,134 +177,57 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
 
-        while let Some((_, '-')) = self.chars.peek() {
-            self.chars.next();
-            if let Some((_, '-')) = self.chars.peek() {
-                self.chars.next();
-                self.skip_line_comment();
-                self.skip_whitespace();
-            } else {
-                return Some(Ok(Token::Minus));
+        // while let Some((_, '-')) = self.chars.peek() {
+        //     self.chars.next();
+        //     if let Some((_, '-')) = self.chars.peek() {
+        //         self.chars.next();
+        //         self.skip_line_comment();
+        //         self.skip_whitespace();
+        //     } else {
+        //         return Some(Ok(Token::Minus));
+        //     }
+        // }
+
+        self.state_machine.reset();
+        let start = self.chars.peek()?.0;
+        let mut end = start;
+        while let Some((_, char)) = self.chars.peek() {
+            if !self.state_machine.next(*char) {
+                break;
             }
+            self.chars.next();
+            end += 1;
         }
 
-        let token = match self.chars.next()? {
-            (_, '+') => Token::Plus,
-            (_, '*') => Token::Asterisk,
-            (_, '%') => Token::Percent,
-            (_, '^') => Token::Circumflex,
-            (_, '#') => Token::Hash,
-            (_, '&') => Token::Ampersand,
-            (_, '|') => Token::Bar,
-            (_, ';') => Token::Semicolon,
-            (_, ',') => Token::Comma,
-            (_, '(') => Token::LeftParenthesis,
-            (_, ')') => Token::RightParenthesis,
-            (_, '{') => Token::LeftBrace,
-            (_, '}') => Token::RightBrace,
-            (_, ']') => Token::RightBracket,
-            (_, '[') => match self.chars.peek() {
-                Some((_, '[' | '=')) => match self.read_raw_string() {
-                    Ok(str) => Token::String(str),
-                    Err(why) => return Some(Err(why)),
-                },
-                _ => Token::LeftBracket,
-            },
-            (start, '0') => match self.chars.peek() {
-                Some((_, 'x' | 'X')) => {
-                    self.chars.next();
-                    match self.read_hexadecimal(start) {
-                        Ok(str) => Token::Number(str),
-                        Err(why) => return Some(Err(why)),
-                    }
-                }
-                _ => match self.read_number(start, true) {
-                    Ok(str) => Token::Number(str),
-                    Err(why) => return Some(Err(why)),
-                },
-            },
-            (start, '1'..='9') => match self.read_number(start, true) {
-                Ok(str) => Token::Number(str),
-                Err(why) => return Some(Err(why)),
-            },
-            (_, '/') => match self.chars.peek() {
-                Some((_, '/')) => {
-                    self.chars.next();
-                    Token::DoubleSlash
-                }
-                _ => Token::Slash,
-            },
-            (_, '~') => match self.chars.peek() {
-                Some((_, '=')) => {
-                    self.chars.next();
-                    Token::Different
-                }
-                _ => Token::Tilde,
-            },
-            (_, '>') => match self.chars.peek() {
-                Some((_, '>')) => {
-                    self.chars.next();
-                    Token::RightShift
-                }
-                Some((_, '=')) => {
-                    self.chars.next();
-                    Token::GreaterThanOrEqual
-                }
-                _ => Token::GreaterThan,
-            },
-            (_, '<') => match self.chars.peek() {
-                Some((_, '<')) => {
-                    self.chars.next();
-                    Token::LeftShift
-                }
-                Some((_, '=')) => {
-                    self.chars.next();
-                    Token::LessThanOrEqual
-                }
-                _ => Token::LessThan,
-            },
-            (_, '=') => match self.chars.peek() {
-                Some((_, '=')) => {
-                    self.chars.next();
-                    Token::Equals
-                }
-                _ => Token::Assign,
-            },
-            (_, ':') => match self.chars.peek() {
-                Some((_, ':')) => {
-                    self.chars.next();
-                    Token::DoubleColon
-                }
-                _ => Token::Colon,
-            },
-            (start, '.') => match self.chars.peek() {
-                Some((_, '0'..='9')) => match self.read_number(start, false) {
-                    Ok(str) => Token::Number(str),
-                    Err(why) => return Some(Err(why)),
-                },
-                Some((_, '.')) => {
-                    self.chars.next();
-                    match self.chars.peek() {
-                        Some((_, '.')) => {
-                            self.chars.next();
-                            Token::TripleDot
-                        }
-                        _ => Token::DoubleDot,
-                    }
-                }
-                _ => Token::Dot,
-            },
-            (start, quote @ ('\'' | '"')) => match self.read_quoted_string(start + 1, quote) {
-                Ok(str) => Token::String(str),
-                Err(why) => return Some(Err(why)),
-            },
-            (start, 'a'..='z' | 'A'..='Z' | '_') => match self.read_identifier(start) {
-                Ok(str) => Token::str_to_keyword(str).unwrap_or(Token::Identifier(str)),
-                Err(why) => return Some(Err(why)),
-            },
-            (_, char) => return Some(Err(LustError::UnexpectedChar(char))),
+        let token = match self.state_machine.state() {
+            OuterState::Plus => Token::Plus,
+            OuterState::Minus => Token::Minus,
+            OuterState::Asterisk => Token::Asterisk,
+            OuterState::Percent => Token::Percent,
+            OuterState::Circumflex => Token::Circumflex,
+            OuterState::Hash => Token::Hash,
+            OuterState::Ampersand => Token::Ampersand,
+            OuterState::Bar => Token::Bar,
+            OuterState::Semicolon => Token::Semicolon,
+            OuterState::Comma => Token::Comma,
+            OuterState::LeftParenthesis => Token::LeftParenthesis,
+            OuterState::RightParenthesis => Token::RightParenthesis,
+            OuterState::LeftBrace => Token::LeftBrace,
+            OuterState::RightBrace => Token::RightBrace,
+            OuterState::RightBracket => Token::RightBracket,
+            OuterState::LeftBracket => Token::LeftBracket,
+            OuterState::Slash => Token::Slash,
+            OuterState::Tilde => Token::Tilde,
+            OuterState::LessThan => Token::LessThan,
+            OuterState::GreaterThan => Token::GreaterThan,
+            OuterState::Equals => Token::Assign,
+            OuterState::Colon => Token::Colon,
+            OuterState::Dot => Token::Dot,
+            OuterState::DoubleDot => Token::DoubleDot,
+            OuterState::TripleDot => Token::TripleDot,
+            OuterState::Number(_) => Token::Number(&self.code[start..end]),
+            _ => return None,
         };
-
         Some(Ok(token))
     }
 }

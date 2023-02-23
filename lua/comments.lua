@@ -1,5 +1,5 @@
 -- some bullshit
---[[print('Hi from comment')]]
+--[[print('Hi from comment')--[[]]
 print0("This is fine") -- That's cool
 ---[[
 print1("This execute") -- aaaaaaaaaa

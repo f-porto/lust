@@ -1,4 +1,7 @@
-use super::{number::NumberStateMachine, StateMachine};
+use super::{
+    comment::CommentStateMachine, number::NumberStateMachine, string::StringStateMachine,
+    StateMachine,
+};
 
 #[derive(Debug)]
 pub enum OuterState {
@@ -28,9 +31,18 @@ pub enum OuterState {
     Dot,
     DoubleDot,
     TripleDot,
-    Quote,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    DoubleEquals,
+    Different,
+    LeftShift,
+    RightShift,
+    DoubleColon,
+    DoubleSlash,
     Word,
     Number(NumberStateMachine),
+    Comment(CommentStateMachine),
+    String(StringStateMachine),
 }
 
 #[derive(Debug)]
@@ -50,6 +62,8 @@ impl StateMachine<OuterState, char> for OuterStateMachine {
     fn next(&mut self, symbol: char) -> bool {
         match &mut self.state {
             OuterState::Number(machine) => return machine.next(symbol),
+            OuterState::Comment(machine) => return machine.next(symbol),
+            OuterState::String(machine) => return machine.next(symbol),
             _ => {}
         };
 
@@ -82,8 +96,18 @@ impl StateMachine<OuterState, char> for OuterStateMachine {
             (OuterState::Initial, '=') => OuterState::Equals,
             (OuterState::Initial, ':') => OuterState::Colon,
             (OuterState::Initial, '.') => OuterState::Dot,
-            (OuterState::Initial, '\'' | '"') => OuterState::Quote,
             (OuterState::Initial, 'A'..='Z' | 'a'..='z' | '_') => OuterState::Word,
+            (OuterState::Initial, '\'' | '"') => {
+                let mut machine = StringStateMachine::new();
+                machine.next(symbol);
+                OuterState::String(machine)
+            }
+            (OuterState::LeftBracket, '[' | '=') => {
+                let mut machine = StringStateMachine::new();
+                machine.next('[');
+                machine.next(symbol);
+                OuterState::String(machine)
+            }
             (OuterState::Dot, '.') => OuterState::DoubleDot,
             (OuterState::Dot, '0'..='9') => {
                 let mut machine = NumberStateMachine::new();
@@ -92,6 +116,21 @@ impl StateMachine<OuterState, char> for OuterStateMachine {
                 OuterState::Number(machine)
             }
             (OuterState::DoubleDot, '.') => OuterState::TripleDot,
+            (OuterState::GreaterThan, '=') => OuterState::GreaterThanOrEqual,
+            (OuterState::GreaterThan, '>') => OuterState::RightShift,
+            (OuterState::LessThan, '=') => OuterState::LessThanOrEqual,
+            (OuterState::LessThan, '<') => OuterState::LeftShift,
+            (OuterState::Equals, '=') => OuterState::DoubleEquals,
+            (OuterState::Tilde, '=') => OuterState::Different,
+            (OuterState::Colon, ':') => OuterState::DoubleColon,
+            (OuterState::Slash, '/') => OuterState::DoubleSlash,
+            (OuterState::Minus, '-') => {
+                let mut machine = CommentStateMachine::new();
+                machine.next('-');
+                machine.next('-');
+                OuterState::Comment(machine)
+            }
+            (OuterState::Word, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9') => OuterState::Word,
             _ => return false,
         };
         true

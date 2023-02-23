@@ -1,13 +1,17 @@
-use std::{
-    iter::{Enumerate, Peekable},
-    str::Chars,
-};
+use std::{iter::Peekable, str::CharIndices};
 
-use crate::{error::LustError, state_machine::{StateMachine, outer::{OuterStateMachine, OuterState}}, token::Token};
+use crate::{
+    error::LustError,
+    state_machine::{
+        outer::{OuterState, OuterStateMachine},
+        StateMachine,
+    },
+    token::Token,
+};
 
 pub struct Lexer<'a> {
     code: &'a str,
-    chars: Peekable<Enumerate<Chars<'a>>>,
+    chars: Peekable<CharIndices<'a>>,
     state_machine: OuterStateMachine,
 }
 
@@ -15,150 +19,8 @@ impl<'a> Lexer<'a> {
     pub fn new(code: &'a str) -> Self {
         Self {
             code,
-            chars: code.chars().enumerate().peekable(),
+            chars: code.char_indices().peekable(),
             state_machine: OuterStateMachine::new(),
-        }
-    }
-
-    fn read_quoted_string(&mut self, start: usize, quote: char) -> Result<&'a str, LustError> {
-        let mut escaped = false;
-        for char in self.chars.by_ref() {
-            match char {
-                (_, '\\') => escaped = !escaped,
-                (end, char) if char == quote => {
-                    if !escaped {
-                        return Ok(&self.code[start..end]);
-                    } else {
-                        escaped = false;
-                    }
-                }
-                _ => escaped = false,
-            }
-        }
-
-        Err(LustError::UnfinishedString)
-    }
-
-    fn read_raw_string(&mut self) -> Result<&'a str, LustError> {
-        let mut equals = 0usize;
-        while self.chars.next_if(|(_, char)| *char == '=').is_some() {
-            equals += 1;
-        }
-
-        let start = match self.chars.next() {
-            Some((pos, '[')) => pos + 1,
-            Some((_, char)) => return Err(LustError::UnexpectedChar(char)),
-            None => return Err(LustError::MissingCharacter),
-        };
-
-        while let Some((end, char)) = self.chars.next() {
-            if char == ']' {
-                let mut end_equals = 0usize;
-                while self.chars.next_if(|(_, char)| *char == '=').is_some() {
-                    end_equals += 1;
-                }
-                match self.chars.next() {
-                    Some((_, ']')) if equals == end_equals => return Ok(&self.code[start..end]),
-                    _ => {}
-                };
-            }
-        }
-
-        Err(LustError::UnfinishedString)
-    }
-
-    fn read_hexadecimal(&mut self, start: usize) -> Result<&'a str, LustError> {
-        while let Some((e, char)) = self.chars.peek() {
-            match char {
-                '0'..='9' | 'a'..='f' | 'A'..='F' => {
-                    self.chars.next();
-                }
-                '.' => {
-                    self.chars.next();
-                    break;
-                }
-                'p' | 'P' => {
-                    break;
-                }
-                _ => return Ok(&self.code[start..*e]),
-            };
-        }
-
-        while let Some((e, char)) = self.chars.peek() {
-            match char {
-                '0'..='9' | 'a'..='f' | 'A'..='F' => {
-                    self.chars.next();
-                }
-                'p' | 'P' => {
-                    self.chars.next();
-                    break;
-                }
-                _ => return Ok(&self.code[start..*e]),
-            };
-        }
-
-        if let Some((_, '-' | '+')) = self.chars.peek() {
-            self.chars.next();
-        };
-
-        let mut end;
-        match self.chars.peek() {
-            Some((e, '0'..='9' | 'a'..='f' | 'A'..='F')) => {
-                end = *e;
-                self.chars.next();
-            }
-            _ => return Err(LustError::MalformedNumber),
-        };
-
-        while let Some((e, '0'..='9' | 'a'..='f' | 'A'..='F')) = self.chars.peek() {
-            end = *e;
-            self.chars.next();
-        }
-
-        Ok(&self.code[start..=end])
-    }
-
-    fn read_identifier(&mut self, start: usize) -> Result<&'a str, LustError> {
-        let mut end = start;
-        while let Some((e, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')) = self.chars.peek() {
-            end = *e;
-            self.chars.next();
-        }
-
-        Ok(&self.code[start..=end])
-    }
-
-    fn skip_line_comment(&mut self) {
-        match self.chars.next() {
-            Some((_, '[')) => match self.chars.next() {
-                Some((_, '[')) => {
-                    self.skip_block_comment();
-                    return;
-                }
-                Some((_, '\n')) => return,
-                _ => {}
-            },
-            Some((_, '\n')) => return,
-            _ => {}
-        }
-        for (_, char) in self.chars.by_ref() {
-            if char == '\n' {
-                break;
-            }
-        }
-    }
-
-    fn skip_block_comment(&mut self) {
-        let mut end_brackets = 0;
-        for (_, char) in self.chars.by_ref() {
-            if char == ']' {
-                end_brackets += 1;
-            } else {
-                end_brackets = 0;
-            }
-            if end_brackets == 2 {
-                break;
-            }
         }
     }
 
@@ -176,17 +38,6 @@ impl<'a> Iterator for Lexer<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
-
-        // while let Some((_, '-')) = self.chars.peek() {
-        //     self.chars.next();
-        //     if let Some((_, '-')) = self.chars.peek() {
-        //         self.chars.next();
-        //         self.skip_line_comment();
-        //         self.skip_whitespace();
-        //     } else {
-        //         return Some(Ok(Token::Minus));
-        //     }
-        // }
 
         self.state_machine.reset();
         let start = self.chars.peek()?.0;
@@ -225,7 +76,22 @@ impl<'a> Iterator for Lexer<'a> {
             OuterState::Dot => Token::Dot,
             OuterState::DoubleDot => Token::DoubleDot,
             OuterState::TripleDot => Token::TripleDot,
+            OuterState::DoubleEquals => Token::Equals,
+            OuterState::Different => Token::Different,
+            OuterState::GreaterThanOrEqual => Token::GreaterThanOrEqual,
+            OuterState::LessThanOrEqual => Token::LessThanOrEqual,
+            OuterState::LeftShift => Token::LeftShift,
+            OuterState::RightShift => Token::RightShift,
+            OuterState::DoubleColon => Token::DoubleColon,
+            OuterState::DoubleSlash => Token::DoubleSlash,
+            OuterState::Word => Token::str_to_keyword(&self.code[start..end])
+                .unwrap_or(Token::Identifier(&self.code[start..end])),
             OuterState::Number(_) => Token::Number(&self.code[start..end]),
+            OuterState::String(machine) => {
+                let skip = machine.skip();
+                Token::String(&self.code[(start + skip)..(end - skip)])
+            }
+            OuterState::Comment(_) => return self.next(),
             _ => return None,
         };
         Some(Ok(token))
@@ -307,6 +173,7 @@ mod tests {
                 Token::Number("0X1.921FB54442D18P+1"),
                 Token::Number("0x.23p-4"),
                 Token::Number("0x3234.p+3"),
+                Token::Number("0x4342p+45"),
             ],
         )
     }
@@ -340,6 +207,8 @@ mod tests {
                 Token::String("\\97lo\\10\\04923\""),
                 Token::String("0 alo\n123\""),
                 Token::String("2\nalo\n123\""),
+                Token::String("sadf"),
+                Token::String("a]===]a"),
             ],
         )
     }

@@ -116,7 +116,7 @@ impl<'a> TokenNode<'a> {
                 } else if right.is_none() {
                     let _ = replace(right, Some(Box::new(node)));
                 } else if node.weight() <= right.as_ref().unwrap().weight() {
-                    let free_node = replace(right, None);
+                    let free_node = right.take();
                     node.insert(*free_node.unwrap());
                     let _ = replace(right, Some(Box::new(node)));
                 } else {
@@ -127,7 +127,7 @@ impl<'a> TokenNode<'a> {
                 if center.is_none() {
                     let _ = replace(center, Some(Box::new(node)));
                 } else if node.weight() <= center.as_ref().unwrap().weight() {
-                    let free_node = replace(center, None);
+                    let free_node = center.take();
                     node.insert(*free_node.unwrap());
                     let _ = replace(center, Some(Box::new(node)));
                 } else {
@@ -143,7 +143,7 @@ impl<'a> TokenNode<'a> {
         }
     }
 
-    fn to_expression(self) -> Result<Expression<'a>, LustError> {
+    fn into_expression(self) -> Result<Expression<'a>, LustError> {
         let expression = match self {
             Self::Binary {
                 value, left, right, ..
@@ -165,8 +165,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::Addition {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::Minus => {
@@ -177,8 +177,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::Subtraction {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::Asterisk => {
@@ -189,8 +189,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::Multiplication {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::Slash => {
@@ -201,8 +201,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::Division {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::LessThan => {
@@ -212,8 +212,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::LessThan {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::GreaterThan => {
@@ -224,8 +224,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::GreaterThan {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::LessThanOrEqual => {
@@ -236,8 +236,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::LessThanOrEqual {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::GreaterThanOrEqual => {
@@ -248,8 +248,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::GreaterThanOrEqual {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::Equals => {
@@ -260,8 +260,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::Equals {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 Token::Different => {
@@ -272,8 +272,8 @@ impl<'a> TokenNode<'a> {
                     return Err(LustError::ExpectedButGotNothing("rhs".into()));
                 };
                     Expression::Different {
-                        lhs: Box::new(lhs.to_expression()?),
-                        rhs: Box::new(rhs.to_expression()?),
+                        lhs: Box::new(lhs.into_expression()?),
+                        rhs: Box::new(rhs.into_expression()?),
                     }
                 }
                 token => unreachable!(
@@ -287,7 +287,7 @@ impl<'a> TokenNode<'a> {
                             return Err(LustError::ExpectedButGotNothing("expression".into()));
                         };
                     Expression::Not {
-                        expression: Box::new(center.to_expression()?),
+                        expression: Box::new(center.into_expression()?),
                     }
                 }
                 Token::Minus => {
@@ -295,14 +295,14 @@ impl<'a> TokenNode<'a> {
                         return Err(LustError::ExpectedButGotNothing("expression".into()));
                     };
                     Expression::UnaryMinus {
-                        expression: Box::new(center.to_expression()?),
+                        expression: Box::new(center.into_expression()?),
                     }
                 }
                 token => unreachable!("This is unreachable, `{:?}`", token),
             },
             Self::Nullary { value, .. } => match value {
                 Token::Number(number) => Expression::Number(Number {}),
-                Token::Identifier(ref identifier) => {
+                Token::Identifier(identifier) => {
                     Expression::Variable(Variable::new(identifier))
                 }
                 Token::True => Expression::Bool(true),

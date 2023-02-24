@@ -1,6 +1,6 @@
 use super::{
-    comment::CommentStateMachine, number::NumberStateMachine, string::StringStateMachine,
-    StateMachine,
+    comment::CommentStateMachine, number::NumberStateMachine, string::StringStateMachine, State,
+    StateMachine, Symbol,
 };
 
 #[derive(Debug)]
@@ -45,6 +45,30 @@ pub enum OuterState {
     String(StringStateMachine),
 }
 
+impl State<Symbol> for OuterState {
+    fn is_final(&self) -> bool {
+        !matches!(self, Self::Initial)
+    }
+
+    fn expects(&self) -> Vec<Symbol> {
+        match self {
+            Self::Initial => vec![Symbol::Any],
+            Self::LeftBracket => vec![Symbol::One('['), Symbol::One('=')],
+            Self::Dot => vec![Symbol::One('.'), Symbol::Digit],
+            Self::DoubleDot => vec![Symbol::One('.')],
+            Self::GreaterThan => vec![Symbol::One('='), Symbol::One('>')],
+            Self::LessThan => vec![Symbol::One('='), Symbol::One('<')],
+            Self::Equals => vec![Symbol::One('=')],
+            Self::Tilde => vec![Symbol::One('=')],
+            Self::Colon => vec![Symbol::One(':')],
+            Self::Slash => vec![Symbol::One('/')],
+            Self::Minus => vec![Symbol::One('-')],
+            Self::Word => vec![Symbol::Letter, Symbol::Digit, Symbol::One('_')],
+            _ => vec![],
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct OuterStateMachine {
     state: OuterState,
@@ -58,7 +82,7 @@ impl OuterStateMachine {
     }
 }
 
-impl StateMachine<OuterState, char> for OuterStateMachine {
+impl StateMachine<Symbol, OuterState, char> for OuterStateMachine {
     fn next(&mut self, symbol: char) -> bool {
         match &mut self.state {
             OuterState::Number(machine) => return machine.next(symbol),

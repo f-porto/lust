@@ -1,4 +1,4 @@
-use super::StateMachine;
+use super::{State, StateMachine, Symbol};
 
 #[derive(Debug)]
 pub enum NumberState {
@@ -33,7 +33,43 @@ impl NumberStateMachine {
     }
 }
 
-impl StateMachine<NumberState, char> for NumberStateMachine {
+impl State<Symbol> for NumberState {
+    fn is_final(&self) -> bool {
+        matches!(
+            self,
+            Self::Zero
+                | Self::Digit
+                | Self::Decimal
+                | Self::EDigit
+                | Self::XDigit
+                | Self::XDecimal
+                | Self::XPDigit
+        )
+    }
+
+    fn expects(&self) -> Vec<Symbol> {
+        match self {
+            Self::Initial => vec![Symbol::One('-'), Symbol::One('.'), Symbol::Digit],
+            Self::Minus => vec![Symbol::One('.'), Symbol::Digit],
+            Self::Zero => vec![Symbol::One('x'), Symbol::One('.'), Symbol::Digit],
+            Self::Digit => vec![Symbol::Digit, Symbol::One('.'), Symbol::One('e')],
+            Self::Dot => vec![Symbol::Digit],
+            Self::Decimal => vec![Symbol::Digit, Symbol::One('e')],
+            Self::E => vec![Symbol::One('+'), Symbol::One('-'), Symbol::Digit],
+            Self::ESignal => vec![Symbol::Digit],
+            Self::EDigit => vec![Symbol::Digit],
+            Self::X => vec![Symbol::One('.'), Symbol::HexDigit],
+            Self::XDigit => vec![Symbol::One('.'), Symbol::One('p'), Symbol::HexDigit],
+            Self::XDecimal => vec![Symbol::One('p'), Symbol::HexDigit],
+            Self::XDot => vec![Symbol::HexDigit],
+            Self::XP => vec![Symbol::One('-'), Symbol::One('+'), Symbol::HexDigit],
+            Self::XPSignal => vec![Symbol::HexDigit],
+            Self::XPDigit => vec![Symbol::HexDigit],
+        }
+    }
+}
+
+impl StateMachine<Symbol, NumberState, char> for NumberStateMachine {
     fn next(&mut self, symbol: char) -> bool {
         self.state = match (&self.state, symbol) {
             (NumberState::Initial, '.') => NumberState::Dot,

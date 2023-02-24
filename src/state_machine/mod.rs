@@ -3,7 +3,7 @@ pub mod number;
 pub mod outer;
 pub mod string;
 
-pub trait StateMachine<SMState: State<SMSymbol>, SMSymbol>: Sized {
+pub trait StateMachine<SExpec, SMState: State<SExpec>, SMSymbol>: Sized {
     fn next(&mut self, symbol: SMSymbol) -> bool;
 
     fn state(&self) -> &'_ SMState;
@@ -11,13 +11,16 @@ pub trait StateMachine<SMState: State<SMSymbol>, SMSymbol>: Sized {
     fn reset(&mut self);
 }
 
-pub enum Symbol<T> {
-    One(T),
+pub enum Symbol {
+    Letter,
+    HexDigit,
+    Digit,
+    One(char),
     Any,
 }
 
 pub trait State<T> {
     fn is_final(&self) -> bool;
 
-    fn expects(&self) -> Vec<Symbol<T>>;
+    fn expects(&self) -> Vec<T>;
 }

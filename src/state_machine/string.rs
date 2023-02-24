@@ -1,4 +1,4 @@
-use super::StateMachine;
+use super::{State, StateMachine, Symbol};
 
 #[derive(Debug)]
 pub enum StringState {
@@ -14,6 +14,29 @@ pub enum StringState {
     SingleEscape,
     DoubleEscape,
     End,
+}
+
+impl State<Symbol> for StringState {
+    fn is_final(&self) -> bool {
+        matches!(self, Self::End)
+    }
+
+    fn expects(&self) -> Vec<Symbol> {
+        match self {
+            Self::Initial => vec![Symbol::One('\''), Symbol::One('"'), Symbol::One('[')],
+            Self::SingleQuote => vec![Symbol::Any],
+            Self::DoubleQuote => vec![Symbol::Any],
+            Self::FirstStartBlockQuote => vec![Symbol::One('='), Symbol::One('[')],
+            Self::SecondStartBlockQuote => vec![Symbol::Any],
+            Self::FirstEndBlockQuote => vec![Symbol::Any],
+            Self::SingleChar => vec![Symbol::Any],
+            Self::DoubleChar => vec![Symbol::Any],
+            Self::BlockChar => vec![Symbol::Any],
+            Self::SingleEscape => vec![Symbol::Any],
+            Self::DoubleEscape => vec![Symbol::Any],
+            Self::End => vec![],
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -39,7 +62,7 @@ impl StringStateMachine {
     }
 }
 
-impl StateMachine<StringState, char> for StringStateMachine {
+impl StateMachine<Symbol, StringState, char> for StringStateMachine {
     fn next(&mut self, symbol: char) -> bool {
         self.state = match (&self.state(), symbol) {
             (StringState::Initial, '\'') => StringState::SingleQuote,

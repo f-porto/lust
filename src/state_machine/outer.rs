@@ -64,6 +64,9 @@ impl State<Symbol> for OuterState {
             Self::Slash => vec![Symbol::One('/')],
             Self::Minus => vec![Symbol::One('-')],
             Self::Word => vec![Symbol::Letter, Symbol::Digit, Symbol::One('_')],
+            Self::Number(machine) => machine.state().expects(),
+            Self::String(machine) => machine.state().expects(),
+            Self::Comment(machine) => machine.state().expects(),
             _ => vec![],
         }
     }

@@ -27,7 +27,7 @@ impl CommentStateMachine {
     }
 }
 
-impl State<char> for CommentState {
+impl State<Symbol> for CommentState {
     fn is_final(&self) -> bool {
         matches!(
             self,
@@ -35,22 +35,22 @@ impl State<char> for CommentState {
         )
     }
 
-    fn expects(&self) -> Vec<Symbol<char>> {
+    fn expects(&self) -> Vec<Symbol> {
         match self {
-            CommentState::Initial => vec![Symbol::One('-')],
-            CommentState::FirstDash => vec![Symbol::one('-')],
-            CommentState::SecondDash => vec![Symbol::Any],
-            CommentState::FirstLeftBracket => vec![Symbol::Any],
-            CommentState::SecondLeftBracket => vec![Symbol::Any],
-            CommentState::FistRightBracket => vec![Symbol::Any],
-            CommentState::AnythingLine => vec![Symbol::Any],
-            CommentState::AnythingBlock => vec![Symbol::Any],
-            CommentState::End => vec![],
+            Self::Initial => vec![Symbol::One('-')],
+            Self::FirstDash => vec![Symbol::One('-')],
+            Self::SecondDash => vec![Symbol::Any],
+            Self::FirstLeftBracket => vec![Symbol::Any],
+            Self::SecondLeftBracket => vec![Symbol::Any],
+            Self::FistRightBracket => vec![Symbol::Any],
+            Self::AnythingLine => vec![Symbol::Any],
+            Self::AnythingBlock => vec![Symbol::Any],
+            Self::End => vec![],
         }
     }
 }
 
-impl StateMachine<CommentState, char> for CommentStateMachine {
+impl StateMachine<Symbol, CommentState, char> for CommentStateMachine {
     fn next(&mut self, symbol: char) -> bool {
         self.state = match (&self.state, symbol) {
             (CommentState::Initial, '-') => CommentState::FirstDash,

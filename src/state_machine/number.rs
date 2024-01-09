@@ -51,7 +51,12 @@ impl State<Symbol> for NumberState {
         match self {
             Self::Initial => vec![Symbol::One('-'), Symbol::One('.'), Symbol::Digit],
             Self::Minus => vec![Symbol::One('.'), Symbol::Digit],
-            Self::Zero => vec![Symbol::One('x'), Symbol::One('.'), Symbol::Digit],
+            Self::Zero => vec![
+                Symbol::One('x'),
+                Symbol::One('.'),
+                Symbol::Digit,
+                Symbol::One('e'),
+            ],
             Self::Digit => vec![Symbol::Digit, Symbol::One('.'), Symbol::One('e')],
             Self::Dot => vec![Symbol::Digit],
             Self::Decimal => vec![Symbol::Digit, Symbol::One('e')],
@@ -81,6 +86,7 @@ impl StateMachine<Symbol, NumberState, char> for NumberStateMachine {
             (NumberState::Minus, '1'..='9') => NumberState::Digit,
             (NumberState::Zero, 'x' | 'X') => NumberState::X,
             (NumberState::Zero, '.') => NumberState::Decimal,
+            (NumberState::Zero, 'e' | 'E') => NumberState::E,
             (NumberState::Zero, '0'..='9') => NumberState::Digit,
             (NumberState::Digit, '0'..='9') => NumberState::Digit,
             (NumberState::Digit, '.') => NumberState::Decimal,
@@ -219,7 +225,7 @@ mod tests {
         for exp in iexps {
             machine.reset();
             for s in exp.chars() {
-                assert!(machine.next(s));
+                assert!(machine.next(s), "exp={exp}");
             }
             matches!(machine.state, NumberState::EDigit);
         }

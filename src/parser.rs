@@ -7,7 +7,7 @@ use crate::{
     },
     error::LustError,
     lexer::Lexer,
-    token::Token,
+    token::{Token, TokenKind},
 };
 
 pub struct Parser<'a> {
@@ -17,7 +17,7 @@ pub struct Parser<'a> {
 #[rustfmt::skip]
 macro_rules! expect {
     ($self:ident, $token:pat_param) => {
-        let token = $self.next_token()?;
+        let token = $self.next_token()?.lexeme;
         let $token = token else {
             return Err(LustError::UnexpectedToken(format!("{:?}", token)));
         };
@@ -27,7 +27,7 @@ macro_rules! expect {
 macro_rules! is_next {
     ($self:ident, $token:pat_param) => {
         match $self.lexer.peek() {
-            Some(Ok($token)) => true,
+            Some(Ok(Token { lexeme: $token, .. })) => true,
             Some(Err(why)) => return Err(why.clone()),
             _ => false,
         }
@@ -58,24 +58,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        match self.peek_token()? {
-            Token::Semicolon => self.parse_nothing_statement(),
-            Token::Break => self.parse_break_statement(),
-            Token::DoubleColon => self.parse_label_statement(),
-            Token::Goto => self.parse_goto_statement(),
-            Token::Do => self.parse_do_statement(),
-            Token::While => self.parse_while_statement(),
-            Token::Repeat => self.parse_repeat_statement(),
-            Token::If => self.parse_if_statement(),
-            Token::For => self.parse_for_statement(),
-            Token::Function => self.parse_function_statement(),
-            Token::Local => self.parse_local_statement(),
+        match self.peek_token()?.lexeme {
+            TokenKind::Semicolon => self.parse_nothing_statement(),
+            TokenKind::Break => self.parse_break_statement(),
+            TokenKind::DoubleColon => self.parse_label_statement(),
+            TokenKind::Goto => self.parse_goto_statement(),
+            TokenKind::Do => self.parse_do_statement(),
+            TokenKind::While => self.parse_while_statement(),
+            TokenKind::Repeat => self.parse_repeat_statement(),
+            TokenKind::If => self.parse_if_statement(),
+            TokenKind::For => self.parse_for_statement(),
+            TokenKind::Function => self.parse_function_statement(),
+            TokenKind::Local => self.parse_local_statement(),
             _ => Err(LustError::NotAStatement),
         }
     }
 
     fn parse_name(&mut self) -> Result<Name<'a>, LustError> {
-        expect!(self, Token::Identifier(name));
+        expect!(self, TokenKind::Identifier(name));
         Ok(Name { name })
     }
 
@@ -84,8 +84,8 @@ impl<'a> Parser<'a> {
         loop {
             let name = self.parse_name()?;
             names.push(name);
-            if is_next!(self, Token::Comma) {
-                expect!(self, Token::Comma);
+            if is_next!(self, TokenKind::Comma) {
+                expect!(self, TokenKind::Comma);
             } else {
                 break;
             }
@@ -101,20 +101,20 @@ impl<'a> Parser<'a> {
         };
         #[allow(unused_must_use)]
         loop {
-            match self.peek_token()? {
-                Token::Identifier(name) => {
+            match self.peek_token()?.lexeme {
+                TokenKind::Identifier(name) => {
                     parameters.push(Name { name });
                     self.next_token();
                 }
-                Token::TripleDot => {
+                TokenKind::TripleDot => {
                     self.next_token();
                     parameters.var_args = Some(Expression::VarArgs);
                     break;
                 }
                 _ => break,
             }
-            if is_next!(self, Token::Comma) {
-                expect!(self, Token::Comma);
+            if is_next!(self, TokenKind::Comma) {
+                expect!(self, TokenKind::Comma);
             } else {
                 break;
             }
@@ -125,10 +125,10 @@ impl<'a> Parser<'a> {
 
     fn parse_attribute(&mut self) -> Result<Attribute<'a>, LustError> {
         let name = self.parse_name()?;
-        let attr = if is_next!(self, Token::LessThan) {
-            expect!(self, Token::LessThan);
+        let attr = if is_next!(self, TokenKind::LessThan) {
+            expect!(self, TokenKind::LessThan);
             let name = self.parse_name()?;
-            expect!(self, Token::GreaterThan);
+            expect!(self, TokenKind::GreaterThan);
             Some(name)
         } else {
             None
@@ -143,8 +143,8 @@ impl<'a> Parser<'a> {
         loop {
             let attr = self.parse_attribute()?;
             attrs.push(attr);
-            if is_next!(self, Token::Comma) {
-                expect!(self, Token::Comma);
+            if is_next!(self, TokenKind::Comma) {
+                expect!(self, TokenKind::Comma);
             } else {
                 break;
             }
@@ -160,24 +160,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_nothing_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Semicolon);
+        expect!(self, TokenKind::Semicolon);
         Ok(Statement::Nothing)
     }
 
     fn parse_break_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Break);
+        expect!(self, TokenKind::Break);
         Ok(Statement::Break)
     }
 
     fn parse_local_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Local);
-        let attrs = match self.peek_token()? {
-            Token::Function => return self.parse_local_function_statement(),
-            Token::Identifier(_) => self.parse_attribute_list()?,
+        expect!(self, TokenKind::Local);
+        let attrs = match &self.peek_token()?.lexeme {
+            TokenKind::Function => return self.parse_local_function_statement(),
+            TokenKind::Identifier(_) => self.parse_attribute_list()?,
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
-        let expressions = if is_next!(self, Token::Assign) {
+        let expressions = if is_next!(self, TokenKind::Assign) {
             self.parse_expression_list()?
         } else {
             Vec::new()
@@ -187,13 +187,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_local_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Function);
+        expect!(self, TokenKind::Function);
         let name = self.parse_name()?;
-        expect!(self, Token::LeftParenthesis);
+        expect!(self, TokenKind::LeftParenthesis);
         let parameters = self.parse_parameter_list()?;
-        expect!(self, Token::RightParenthesis);
+        expect!(self, TokenKind::RightParenthesis);
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::LocalFunctionDecl {
             name,
@@ -203,13 +203,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Function);
+        expect!(self, TokenKind::Function);
         let function_name = self.parse_function_name()?;
-        expect!(self, Token::LeftParenthesis);
+        expect!(self, TokenKind::LeftParenthesis);
         let parameters = self.parse_parameter_list()?;
-        expect!(self, Token::RightParenthesis);
+        expect!(self, TokenKind::RightParenthesis);
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::FunctionDecl {
             name: function_name,
@@ -221,8 +221,8 @@ impl<'a> Parser<'a> {
     fn parse_for_statement(&mut self) -> Result<Statement<'a>, LustError> {
         let mut names = self.parse_name_list()?;
 
-        match self.next_token()? {
-            token @ Token::Assign => {
+        match self.next_token()?.lexeme {
+            token @ TokenKind::Assign => {
                 if names.names.len() == 1 {
                     let name = names.names.pop().expect("Should always work");
                     self.parse_numeric_for(name)
@@ -230,28 +230,28 @@ impl<'a> Parser<'a> {
                     Err(LustError::UnexpectedToken(format!("{:?}", token)))
                 }
             }
-            Token::In => self.parse_generic_for(names),
+            TokenKind::In => self.parse_generic_for(names),
             token => Err(LustError::UnexpectedToken(format!("{:?}", token))),
         }
     }
 
     fn parse_numeric_for(&mut self, name: Name<'a>) -> Result<Statement<'a>, LustError> {
         let start = self.parse_expression()?;
-        expect!(self, Token::Comma);
+        expect!(self, TokenKind::Comma);
         let limit = self.parse_expression()?;
 
-        let step = match self.next_token()? {
-            Token::Comma => {
+        let step = match self.next_token()?.lexeme {
+            TokenKind::Comma => {
                 let step = self.parse_expression()?;
-                expect!(self, Token::Do);
+                expect!(self, TokenKind::Do);
                 Some(step)
             }
-            Token::Do => None,
+            TokenKind::Do => None,
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::NumericFor {
             start,
@@ -268,15 +268,15 @@ impl<'a> Parser<'a> {
             let expression = self.parse_expression()?;
             exprs.push(expression);
 
-            match self.next_token()? {
-                Token::Comma => {}
-                Token::Do => break,
+            match self.next_token()?.lexeme {
+                TokenKind::Comma => {}
+                TokenKind::Do => break,
                 token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
             }
         }
 
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::GenericFor {
             names,
@@ -286,27 +286,27 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_else_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Else);
+        expect!(self, TokenKind::Else);
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::Else { block })
     }
 
     fn parse_else_if_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Elseif);
+        expect!(self, TokenKind::Elseif);
         let condition = self.parse_expression()?;
-        expect!(self, Token::Then);
+        expect!(self, TokenKind::Then);
         let block = self.parse_block()?;
 
         #[allow(unused_must_use)]
-        let alternative = match self.peek_token()? {
-            Token::End => {
+        let alternative = match &self.peek_token()?.lexeme {
+            TokenKind::End => {
                 self.next_token();
                 None
             }
-            Token::Elseif => Some(Box::new(self.parse_else_if_statement()?)),
-            Token::Else => Some(Box::new(self.parse_else_statement()?)),
+            TokenKind::Elseif => Some(Box::new(self.parse_else_if_statement()?)),
+            TokenKind::Else => Some(Box::new(self.parse_else_statement()?)),
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
@@ -318,19 +318,19 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::If);
+        expect!(self, TokenKind::If);
         let condition = self.parse_expression()?;
-        expect!(self, Token::Then);
+        expect!(self, TokenKind::Then);
         let block = self.parse_block()?;
 
         #[allow(unused_must_use)]
-        let alternative = match self.peek_token()? {
-            Token::End => {
+        let alternative = match &self.peek_token()?.lexeme {
+            TokenKind::End => {
                 self.next_token();
                 None
             }
-            Token::Elseif => Some(Box::new(self.parse_else_if_statement()?)),
-            Token::Else => Some(Box::new(self.parse_else_statement()?)),
+            TokenKind::Elseif => Some(Box::new(self.parse_else_if_statement()?)),
+            TokenKind::Else => Some(Box::new(self.parse_else_statement()?)),
             token => return Err(LustError::UnexpectedToken(format!("{:?}", token))),
         };
 
@@ -343,7 +343,7 @@ impl<'a> Parser<'a> {
 
     fn parse_repeat_statement(&mut self) -> Result<Statement<'a>, LustError> {
         let block = self.parse_block()?;
-        expect!(self, Token::Until);
+        expect!(self, TokenKind::Until);
         let condition = self.parse_expression()?;
 
         Ok(Statement::Repeat { condition, block })
@@ -351,23 +351,23 @@ impl<'a> Parser<'a> {
 
     fn parse_while_statement(&mut self) -> Result<Statement<'a>, LustError> {
         let condition = self.parse_expression()?;
-        expect!(self, Token::Do);
+        expect!(self, TokenKind::Do);
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::While { condition, block })
     }
 
     fn parse_do_statement(&mut self) -> Result<Statement<'a>, LustError> {
         let block = self.parse_block()?;
-        expect!(self, Token::End);
+        expect!(self, TokenKind::End);
 
         Ok(Statement::Do { block })
     }
 
     fn parse_goto_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::Goto);
-        expect!(self, Token::Identifier(name));
+        expect!(self, TokenKind::Goto);
+        expect!(self, TokenKind::Identifier(name));
 
         Ok(Statement::Goto {
             name: Name { name },
@@ -375,9 +375,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_label_statement(&mut self) -> Result<Statement<'a>, LustError> {
-        expect!(self, Token::DoubleColon);
-        expect!(self, Token::Identifier(name));
-        expect!(self, Token::DoubleColon);
+        expect!(self, TokenKind::DoubleColon);
+        expect!(self, TokenKind::Identifier(name));
+        expect!(self, TokenKind::DoubleColon);
 
         Ok(Statement::Label {
             name: Name { name },
@@ -385,14 +385,14 @@ impl<'a> Parser<'a> {
     }
 
     fn try_parse_return_statement(&mut self) -> Result<Option<Statement<'a>>, LustError> {
-        if is_next!(self, Token::Return) {
-            expect!(self, Token::Return);
+        if is_next!(self, TokenKind::Return) {
+            expect!(self, TokenKind::Return);
             let exprs = match self.parse_expression_list() {
                 Ok(exprs) => Some(exprs),
                 Err(why) => return Err(why), // FIXME: expressions are optional
             };
-            if is_next!(self, Token::Semicolon) {
-                expect!(self, Token::Semicolon);
+            if is_next!(self, TokenKind::Semicolon) {
+                expect!(self, TokenKind::Semicolon);
             }
             Ok(Some(Statement::Return { exprs }))
         } else {
@@ -435,8 +435,8 @@ impl<'a> Parser<'a> {
             let expr = self.parse_expression()?;
             exprs.push(expr);
 
-            if is_next!(self, Token::Comma) {
-                expect!(self, Token::Comma);
+            if is_next!(self, TokenKind::Comma) {
+                expect!(self, TokenKind::Comma);
                 break;
             }
         }

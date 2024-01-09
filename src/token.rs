@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq)]
-pub enum Token<'a> {
+pub enum TokenKind<'a> {
     Identifier(&'a str),
     Number(&'a str),
     String(&'a str),
@@ -75,31 +75,38 @@ pub enum Token<'a> {
     TripleDot,
 }
 
-impl<'a> Token<'a> {
-    pub fn str_to_keyword(code: &'a str) -> Option<Token<'a>> {
+#[derive(Debug, PartialEq)]
+pub struct Token<'a> {
+    pub start: usize,
+    pub end: usize,
+    pub lexeme: TokenKind<'a>,
+}
+
+impl<'a> TokenKind<'a> {
+    pub fn str_to_keyword(code: &'a str) -> Option<TokenKind<'a>> {
         let keyword = match code {
-            "and" => Token::And,
-            "break" => Token::Break,
-            "do" => Token::Do,
-            "else" => Token::Else,
-            "elseif" => Token::Elseif,
-            "end" => Token::End,
-            "false" => Token::False,
-            "for" => Token::For,
-            "function" => Token::Function,
-            "goto" => Token::Goto,
-            "if" => Token::If,
-            "in" => Token::In,
-            "local" => Token::Local,
-            "nil" => Token::Nil,
-            "not" => Token::Not,
-            "or" => Token::Or,
-            "repeat" => Token::Repeat,
-            "return" => Token::Return,
-            "then" => Token::Then,
-            "true" => Token::True,
-            "until" => Token::Until,
-            "while" => Token::While,
+            "and" => TokenKind::And,
+            "break" => TokenKind::Break,
+            "do" => TokenKind::Do,
+            "else" => TokenKind::Else,
+            "elseif" => TokenKind::Elseif,
+            "end" => TokenKind::End,
+            "false" => TokenKind::False,
+            "for" => TokenKind::For,
+            "function" => TokenKind::Function,
+            "goto" => TokenKind::Goto,
+            "if" => TokenKind::If,
+            "in" => TokenKind::In,
+            "local" => TokenKind::Local,
+            "nil" => TokenKind::Nil,
+            "not" => TokenKind::Not,
+            "or" => TokenKind::Or,
+            "repeat" => TokenKind::Repeat,
+            "return" => TokenKind::Return,
+            "then" => TokenKind::Then,
+            "true" => TokenKind::True,
+            "until" => TokenKind::Until,
+            "while" => TokenKind::While,
             _ => return None,
         };
 

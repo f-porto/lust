@@ -3,7 +3,7 @@ use std::mem::replace;
 use crate::{
     ast::{Expression, Number, Variable},
     error::LustError,
-    token::Token,
+    token::{Token, TokenKind},
 };
 
 #[derive(Debug)]
@@ -147,8 +147,8 @@ impl<'a> TokenNode<'a> {
         let expression = match self {
             Self::Binary {
                 value, left, right, ..
-            } => match value {
-                Token::Number(number) => {
+            } => match value.lexeme {
+                TokenKind::Number(number) => {
                     if let Some(token_node) = left {
                         return Err(LustError::UnexpectedToken(format!("{:?}", token_node)));
                     }
@@ -157,120 +157,121 @@ impl<'a> TokenNode<'a> {
                     }
                     Expression::Number(Number {})
                 }
-                Token::Plus => {
+                TokenKind::Plus => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::Addition {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::Minus => {
+                TokenKind::Minus => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::Subtraction {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::Asterisk => {
+                TokenKind::Asterisk => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::Multiplication {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::Slash => {
+                TokenKind::Slash => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::Division {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::LessThan => {
+                TokenKind::LessThan => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));};
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::LessThan {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::GreaterThan => {
+                TokenKind::GreaterThan => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::GreaterThan {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::LessThanOrEqual => {
+                TokenKind::LessThanOrEqual => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::LessThanOrEqual {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::GreaterThanOrEqual => {
+                TokenKind::GreaterThanOrEqual => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::GreaterThanOrEqual {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::Equals => {
+                TokenKind::Equals => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::Equals {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
                     }
                 }
-                Token::Different => {
+                TokenKind::Different => {
                     let Some(lhs) = left else {
-                    return Err(LustError::ExpectedButGotNothing("lhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("lhs".into()));
+                    };
                     let Some(rhs) = right else {
-                    return Err(LustError::ExpectedButGotNothing("rhs".into()));
-                };
+                        return Err(LustError::ExpectedButGotNothing("rhs".into()));
+                    };
                     Expression::Different {
                         lhs: Box::new(lhs.into_expression()?),
                         rhs: Box::new(rhs.into_expression()?),
@@ -281,16 +282,16 @@ impl<'a> TokenNode<'a> {
                     token
                 ),
             },
-            Self::Unary { value, center, .. } => match value {
-                Token::Not => {
+            Self::Unary { value, center, .. } => match value.lexeme {
+                TokenKind::Not => {
                     let Some(center) = center else {
-                            return Err(LustError::ExpectedButGotNothing("expression".into()));
-                        };
+                        return Err(LustError::ExpectedButGotNothing("expression".into()));
+                    };
                     Expression::Not {
                         expression: Box::new(center.into_expression()?),
                     }
                 }
-                Token::Minus => {
+                TokenKind::Minus => {
                     let Some(center) = center else {
                         return Err(LustError::ExpectedButGotNothing("expression".into()));
                     };
@@ -300,13 +301,13 @@ impl<'a> TokenNode<'a> {
                 }
                 token => unreachable!("This is unreachable, `{:?}`", token),
             },
-            Self::Nullary { value, .. } => match value {
-                Token::Number(number) => Expression::Number(Number {}),
-                Token::Identifier(identifier) => {
+            Self::Nullary { value, .. } => match value.lexeme {
+                TokenKind::Number(number) => Expression::Number(Number {}),
+                TokenKind::Identifier(identifier) => {
                     Expression::Variable(Variable::new(identifier))
                 }
-                Token::True => Expression::Bool(true),
-                Token::False => Expression::Bool(false),
+                TokenKind::True => Expression::Bool(true),
+                TokenKind::False => Expression::Bool(false),
                 token => unreachable!("Unreachable right?, {:?}", token),
             },
             Self::NullaryWithExpression {

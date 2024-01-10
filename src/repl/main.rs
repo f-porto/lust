@@ -8,11 +8,11 @@ fn main() {
     let mut content = String::new();
     stdin.read_to_string(&mut content).unwrap();
     let pairs = LuaParser::parse(Rule::All, &content);
-    let Ok(mut pairs) = pairs else {
+    let Ok(pairs) = pairs else {
         println!("{}", pairs.err().unwrap());
         return;
     };
-    for pair in pairs.next().unwrap().into_inner() {
+    for pair in pairs.into_iter() {
         println!("{:?}", pair);
     }
 

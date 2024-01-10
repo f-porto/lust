@@ -113,4 +113,4 @@ String = _{ RawString | SqString | DqString }
 Symbol = _{ Plus | Minus | Asterisks | Slash | Percent | Circumflex | Hash | Ampersand | Tilde | VerticalBar | LeftShift | RightShift | DoubleSlash | DoubleEquals | Different | LessOrEqual | GreaterOrEqual | Less | Greater | Equals | LeftParenthesis | RightParenthesis | LeftBrace | RightBrace | LeftBracket | RightBracket | DoubleColon | Semicolon | Colon | Comma | TripleDot | DoubleDot | Dot }
 Keyword = _{ And | Break | Do | Else | Elseif | End | False | For | Function | Goto | If | In | Local | Nil | Not | Or | Repeat | Return | Then | True | Until | While }
 Comment = _{ LongComment | ShortComment }
-All = { SOI ~ (Comment | Number | String | Symbol | Keyword | Identifier)* ~ EOI }
+All = _{ SOI ~ (Comment | Number | String | Symbol | Keyword | Identifier)* ~ EOI }

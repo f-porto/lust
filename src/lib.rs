@@ -14,12 +14,12 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn check(expected: &[&str], rule: Rule) -> Result<(), Box<dyn Error>> {
-        let text = expected.join(",");
+        let text = expected.join(" ");
         let pairs = LuaParser::parse(rule, &text);
-        let Ok(mut pairs) = pairs else {
+        let Ok(pairs) = pairs else {
             panic!("{}", pairs.err().unwrap());
         };
-        let pairs: Vec<_> = pairs.next().unwrap().into_inner().collect();
+        let pairs: Vec<_> = pairs.into_iter().collect();
 
         println!("{:?}", pairs);
         assert_eq!(pairs.len() - 1, expected.len());
@@ -120,8 +120,14 @@ mod tests {
         let strings = [
             r#"[[]]"#,
             r#"[[Hello, World]]"#,
-            "[===[]===]",
-            "[===[ Hello [=[World]=] ]===]",
+            r#"[===[]===]"#,
+            r#"[===[ Hello [=[World]=] ]===]"#,
+            r#"[=[ a [==[]==] a ]=]"#,
+            r#"[===[
+
+                Hello, World
+
+            ]===]"#
         ];
         check(&strings, Rule::RawStrings)
     }

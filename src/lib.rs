@@ -32,13 +32,13 @@ mod tests {
     #[test]
     fn read_integers() -> Result<(), Box<dyn Error>> {
         let integers = ["0", "12345", "-0", "-123455"];
-        check(&integers, Rule::integers)
+        check(&integers, Rule::Integers)
     }
 
     #[test]
     fn read_hex_integers() -> Result<(), Box<dyn Error>> {
         let integers = ["0x0", "0x123A5", "-0xF", "-0x123CD55"];
-        check(&integers, Rule::hex_integers)
+        check(&integers, Rule::HexIntegers)
     }
 
     #[test]
@@ -56,8 +56,10 @@ mod tests {
             "-7e3",
             "324.1231",
             "-432.423e34",
+            "123e+43",
+            "34e1",
         ];
-        check(&floats, Rule::floats)
+        check(&floats, Rule::Floats)
     }
 
     #[test]
@@ -66,7 +68,7 @@ mod tests {
             "0x12.",
             "-0xf4.",
             "0x.a2",
-            "-0x.12",
+            "-0x.12E",
             "0x34.p-3",
             "0x54.pc5",
             "-0x43f.p23",
@@ -76,13 +78,13 @@ mod tests {
             "0xf324.1231",
             "-0x432.423p3a4",
         ];
-        check(&floats, Rule::hex_floats)
+        check(&floats, Rule::HexFloats)
     }
 
     #[test]
     fn read_identifiers() -> Result<(), Box<dyn Error>> {
         let ids = ["asads", "a", "_", "as8ads", "_232"];
-        check(&ids, Rule::identifiers)
+        check(&ids, Rule::Identifiers)
     }
 
     #[test]
@@ -96,7 +98,7 @@ mod tests {
             r#"'\''"#,
             r#"'\\'"#,
         ];
-        check(&strings, Rule::sq_strings)
+        check(&strings, Rule::SqStrings)
     }
 
     #[test]
@@ -110,7 +112,7 @@ mod tests {
             r#""\"""#,
             r#""\\""#,
         ];
-        check(&strings, Rule::dq_strings)
+        check(&strings, Rule::DqStrings)
     }
 
     #[test]
@@ -121,6 +123,6 @@ mod tests {
             "[===[]===]",
             "[===[ Hello [=[World]=] ]===]",
         ];
-        check(&strings, Rule::raw_strings)
+        check(&strings, Rule::RawStrings)
     }
 }

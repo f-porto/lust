@@ -1,99 +1,108 @@
-plus = { "+" }
-minus = { "-" }
-asterisks = { "*" }
-slash = { "/" }
-percent = { "%" }
-circumflex = { "^" }
-hash = { "#" }
-ampersand = { "&" }
-tilde = { "~" }
-vertical_bar = { "|" }
-left_shift = { "<<" }
-right_shift = { ">>" }
-double_slash = { "//" }
-double_equals = { "==" }
-different = { "~=" }
-less_or_equal = { "<=" }
-greater_or_equal = { ">=" }
-less = { "<" }
-greater = { ">" }
-equals = { "=" }
-left_parenthesis = { "(" }
-right_parenthesis = { ")" }
-left_brace = { "{" }
-right_brace = { "}" }
-left_bracket = { "[" }
-right_bracket = { "]" }
-double_colon = { "::" }
-semicolon = { ";" }
-colon = { ":" }
-comma = { "," }
-triple_dot = { "..." }
-double_dot = { ".." }
-dor = { "." }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
-and = { "and" }
-break = { "break" }
-do = { "do" }
-else = { "else" }
-elseif = { "elseif" }
-end = { "end" }
-false = { "false" }
-for = { "for" }
-function = { "function" }
-goto = { "goto" }
-if = { "if" }
-in = { "in" }
-local = { "local" }
-nil = { "nil" }
-not = { "not" }
-or = { "or" }
-repeat = { "repeat" }
-return = { "return" }
-then = { "then" }
-true = { "true" }
-until = { "until" }
-while = { "while" }
+Plus = @{ "+" }
+Minus = @{ "-" }
+Asterisks = @{ "*" }
+Slash = @{ "/" }
+Percent = @{ "%" }
+Circumflex = @{ "^" }
+Hash = @{ "#" }
+Ampersand = @{ "&" }
+Tilde = @{ "~" }
+VerticalBar = @{ "|" }
+LeftShift = @{ "<<" }
+RightShift = @{ ">>" }
+DoubleSlash = @{ "//" }
+DoubleEquals = @{ "==" }
+Different = @{ "~=" }
+LessOrEqual = @{ "<=" }
+GreaterOrEqual = @{ ">=" }
+Less = @{ "<" }
+Greater = @{ ">" }
+Equals = @{ "=" }
+LeftParenthesis = @{ "(" }
+RightParenthesis = @{ ")" }
+LeftBrace = @{ "{" }
+RightBrace = @{ "}" }
+LeftBracket = @{ "[" }
+RightBracket = @{ "]" }
+DoubleColon = @{ "::" }
+Semicolon = @{ ";" }
+Colon = @{ ":" }
+Comma = @{ "," }
+TripleDot = @{ "..." }
+DoubleDot = @{ ".." }
+Dot = @{ "." }
 
-alpha = _{ 'a'..'z' | 'A'..'Z' }
-digit = _{ '0'..'9' }
-hex_digit = _{ '0'..'9' | 'a'..'f' | 'A'..'F' }
+And = @{ "and" }
+Break = @{ "break" }
+Do = @{ "do" }
+Else = @{ "else" }
+Elseif = @{ "elseif" }
+End = @{ "end" }
+False = @{ "false" }
+For = @{ "for" }
+Function = @{ "function" }
+Goto = @{ "goto" }
+If = @{ "if" }
+In = @{ "in" }
+Local = @{ "local" }
+Nil = @{ "nil" }
+Not = @{ "not" }
+Or = @{ "or" }
+Repeat = @{ "repeat" }
+Return = @{ "return" }
+Then = @{ "then" }
+True = @{ "true" }
+Until = @{ "until" }
+While = @{ "while" }
 
-hex_integer = { "-"? ~ "0x" ~ hex_digit+ }
+Alpha = _{ 'a'..'z' | 'A'..'Z' }
+Digit = _{ '0'..'9' }
+HexDigit = _{ '0'..'9' | 'a'..'f' | 'A'..'F' }
+HexPrefix = _{ "0" ~ ("x" | "X") }
 
-hex_exponent = _{ ("p" | "P") ~ "-"? ~ hex_digit+ }
-hex_float_1 = _{ "-"? ~ "0x" ~ hex_digit* ~ "." ~ hex_digit+ ~ hex_exponent? }
-hex_float_2 = _{ "-"? ~ "0x" ~ hex_digit+ ~ "." ~ hex_digit* ~ hex_exponent? }
-hex_float_3 = _{"-"? ~ "0x" ~ hex_digit+ ~ hex_exponent}
-hex_float = { hex_float_1 | hex_float_2 | hex_float_3 }
+HexExponent = _{ ("p" | "P") ~ ("-" | "+")? ~ HexDigit+ }
+HexFloat1 = _{ "-"? ~ HexPrefix ~ HexDigit* ~ "." ~ HexDigit+ ~ HexExponent? }
+HexFloat2 = _{ "-"? ~ HexPrefix ~ HexDigit+ ~ "." ~ HexDigit* ~ HexExponent? }
+HexFloat3 = _{"-"? ~ HexPrefix ~ HexDigit+ ~ HexExponent}
+HexFloat = @{ HexFloat1 | HexFloat2 | HexFloat3 }
 
-integer = { "-"? ~ digit+ }
+HexInteger = @{ "-"? ~ HexPrefix ~ HexDigit+ }
 
-exponent = _{ ("e" | "E") ~ integer }
-float_1 = _{ "-"? ~ digit* ~ "." ~ digit+ ~ exponent? }
-float_2 = _{ "-"? ~ digit+ ~ "." ~ digit* ~ exponent? }
-float_3 = _{"-"? ~digit+ ~ exponent}
-float = { float_1 | float_2 | float_3 }
+Exponent = _{ ("e" | "E") ~ ("-" | "+")? ~ Digit+ }
+Float1 = _{ "-"? ~ Digit* ~ "." ~ Digit+ ~ Exponent? }
+Float2 = _{ "-"? ~ Digit+ ~ "." ~ Digit* ~ Exponent? }
+Float3 = _{ "-"? ~ Digit+ ~ Exponent }
+Float = @{ Float1 | Float2 | Float3 }
 
-identifier = { ("_" | alpha ) ~ ("_" | alpha | digit)* }
+Integer = @{ "-"? ~ Digit+ }
 
-sq_string = ${"'" ~ sq_inner ~ "'"}
-sq_inner = @{ sq_char* }
-sq_char = _{ !("'" | "\\") ~ ANY | "\\" ~ ANY }
+Identifier = { ("_" | Alpha) ~ ("_" | Alpha | Digit)* }
 
-dq_string = ${"\"" ~ dq_inner ~ "\""}
-dq_inner = @{ dq_char* }
-dq_char = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
+SqString = ${"'" ~ SqInner ~ "'"}
+SqInner = @{ SqChar* }
+SqChar = _{ !("'" | "\\") ~ ANY | "\\" ~ ANY }
 
-raw_string = ${ "[" ~ PUSH("="*) ~ "[" ~ raw_inner ~ "]" ~ POP ~ "]" }
-raw_inner = @{ raw_char* }
-raw_char = _{ !("]" ~ PEEK ~ "]") ~ ANY }
+DqString = ${"\"" ~ DqInner ~ "\""}
+DqInner = @{ DqChar* }
+DqChar = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
 
-integers = { SOI ~ integer ~ ("," ~ integer)* ~ EOI }
-hex_integers = { SOI ~ hex_integer ~ ("," ~ hex_integer)* ~ EOI }
-floats = { SOI ~ float ~ ("," ~ float)* ~ EOI }
-hex_floats = { SOI ~ hex_float ~ ("," ~ hex_float)* ~ EOI }
-identifiers = { SOI ~ identifier ~ ("," ~ identifier)* ~ EOI }
-sq_strings = { SOI ~ sq_string ~ ("," ~ sq_string)* ~ EOI }
-dq_strings = { SOI ~ dq_string ~ ("," ~ dq_string)* ~ EOI }
-raw_strings = { SOI ~ raw_string ~ ("," ~ raw_string)* ~ EOI }
+RawString = ${ "[" ~ PUSH("="*) ~ "[" ~ RawInner ~ "]" ~ POP ~ "]" }
+RawInner = @{ RawChar* }
+RawChar = _{ !("]" ~ PEEK ~ "]") ~ ANY }
+
+Integers = { SOI ~ Integer ~ ("," ~ Integer)* ~ EOI }
+HexIntegers = { SOI ~ HexInteger ~ ("," ~ HexInteger)* ~ EOI }
+Floats = { SOI ~ Float ~ ("," ~ Float)* ~ EOI }
+HexFloats = { SOI ~ HexFloat ~ ("," ~ HexFloat)* ~ EOI }
+Identifiers = { SOI ~ Identifier ~ ("," ~ Identifier)* ~ EOI }
+SqStrings = { SOI ~ SqString ~ ("," ~ SqString)* ~ EOI }
+DqStrings = { SOI ~ DqString ~ ("," ~ DqString)* ~ EOI }
+RawStrings = { SOI ~ RawString ~ ("," ~ RawString)* ~ EOI }
+
+Number = { HexFloat | Float | HexInteger | Integer }
+String = { SqString | DqString | RawString }
+Symbol = { Plus | Minus | Asterisks | Slash | Percent | Circumflex | Hash | Ampersand | Tilde | VerticalBar | LeftShift | RightShift | DoubleSlash | DoubleEquals | Different | LessOrEqual | GreaterOrEqual | Less | Greater | Equals | LeftParenthesis | RightParenthesis | LeftBrace | RightBrace | LeftBracket | RightBracket | DoubleColon | Semicolon | Colon | Comma | TripleDot | DoubleDot | Dot }
+Keyword = { And | Break | Do | Else | Elseif | End | False | For | Function | Goto | If | In | Local | Nil | Not | Or | Repeat | Return | Then | True | Until | While }
+All = { SOI ~ (Number | String | Symbol | Keyword)* ~ EOI }

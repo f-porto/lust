@@ -1,0 +1,99 @@
+plus = { "+" }
+minus = { "-" }
+asterisks = { "*" }
+slash = { "/" }
+percent = { "%" }
+circumflex = { "^" }
+hash = { "#" }
+ampersand = { "&" }
+tilde = { "~" }
+vertical_bar = { "|" }
+left_shift = { "<<" }
+right_shift = { ">>" }
+double_slash = { "//" }
+double_equals = { "==" }
+different = { "~=" }
+less_or_equal = { "<=" }
+greater_or_equal = { ">=" }
+less = { "<" }
+greater = { ">" }
+equals = { "=" }
+left_parenthesis = { "(" }
+right_parenthesis = { ")" }
+left_brace = { "{" }
+right_brace = { "}" }
+left_bracket = { "[" }
+right_bracket = { "]" }
+double_colon = { "::" }
+semicolon = { ";" }
+colon = { ":" }
+comma = { "," }
+triple_dot = { "..." }
+double_dot = { ".." }
+dor = { "." }
+
+and = { "and" }
+break = { "break" }
+do = { "do" }
+else = { "else" }
+elseif = { "elseif" }
+end = { "end" }
+false = { "false" }
+for = { "for" }
+function = { "function" }
+goto = { "goto" }
+if = { "if" }
+in = { "in" }
+local = { "local" }
+nil = { "nil" }
+not = { "not" }
+or = { "or" }
+repeat = { "repeat" }
+return = { "return" }
+then = { "then" }
+true = { "true" }
+until = { "until" }
+while = { "while" }
+
+alpha = _{ 'a'..'z' | 'A'..'Z' }
+digit = _{ '0'..'9' }
+hex_digit = _{ '0'..'9' | 'a'..'f' | 'A'..'F' }
+
+hex_integer = { "-"? ~ "0x" ~ hex_digit+ }
+
+hex_exponent = _{ ("p" | "P") ~ "-"? ~ hex_digit+ }
+hex_float_1 = _{ "-"? ~ "0x" ~ hex_digit* ~ "." ~ hex_digit+ ~ hex_exponent? }
+hex_float_2 = _{ "-"? ~ "0x" ~ hex_digit+ ~ "." ~ hex_digit* ~ hex_exponent? }
+hex_float_3 = _{"-"? ~ "0x" ~ hex_digit+ ~ hex_exponent}
+hex_float = { hex_float_1 | hex_float_2 | hex_float_3 }
+
+integer = { "-"? ~ digit+ }
+
+exponent = _{ ("e" | "E") ~ integer }
+float_1 = _{ "-"? ~ digit* ~ "." ~ digit+ ~ exponent? }
+float_2 = _{ "-"? ~ digit+ ~ "." ~ digit* ~ exponent? }
+float_3 = _{"-"? ~digit+ ~ exponent}
+float = { float_1 | float_2 | float_3 }
+
+identifier = { ("_" | alpha ) ~ ("_" | alpha | digit)* }
+
+sq_string = ${"'" ~ sq_inner ~ "'"}
+sq_inner = @{ sq_char* }
+sq_char = _{ !("'" | "\\") ~ ANY | "\\" ~ ANY }
+
+dq_string = ${"\"" ~ dq_inner ~ "\""}
+dq_inner = @{ dq_char* }
+dq_char = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
+
+raw_string = ${ "[" ~ PUSH("="*) ~ "[" ~ raw_inner ~ "]" ~ POP ~ "]" }
+raw_inner = @{ raw_char* }
+raw_char = _{ !("]" ~ PEEK ~ "]") ~ ANY }
+
+integers = { SOI ~ integer ~ ("," ~ integer)* ~ EOI }
+hex_integers = { SOI ~ hex_integer ~ ("," ~ hex_integer)* ~ EOI }
+floats = { SOI ~ float ~ ("," ~ float)* ~ EOI }
+hex_floats = { SOI ~ hex_float ~ ("," ~ hex_float)* ~ EOI }
+identifiers = { SOI ~ identifier ~ ("," ~ identifier)* ~ EOI }
+sq_strings = { SOI ~ sq_string ~ ("," ~ sq_string)* ~ EOI }
+dq_strings = { SOI ~ dq_string ~ ("," ~ dq_string)* ~ EOI }
+raw_strings = { SOI ~ raw_string ~ ("," ~ raw_string)* ~ EOI }

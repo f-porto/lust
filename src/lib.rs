@@ -5,3 +5,4 @@ mod lexer;
 mod parser;
 mod state_machine;
 mod token;
+mod expression_parser;

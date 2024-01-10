@@ -7,18 +7,17 @@ use crate::{
     },
     error::LustError,
     lexer::Lexer,
-    token::{Token, TokenKind},
+    token::{Token, TokenKind}, expression_tree::TokenTree,
 };
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
 }
 
-#[rustfmt::skip]
 macro_rules! expect {
     ($self:ident, $token:pat_param) => {
-        let token = $self.next_token()?.lexeme;
-        let $token = token else {
+        let token = $self.next_token()?;
+        let $token = token.lexeme else {
             return Err(LustError::UnexpectedToken(format!("{:?}", token)));
         };
     };
@@ -41,7 +40,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Result<Token<'a>, LustError> {
+    pub fn next_token(&mut self) -> Result<Token<'a>, LustError> {
         if let Some(token) = self.lexer.next() {
             Ok(token?)
         } else {
@@ -49,7 +48,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn peek_token(&mut self) -> Result<&Token<'a>, LustError> {
+    pub fn peek_token(&mut self) -> Result<&Token<'a>, LustError> {
         if let Some(token) = self.lexer.peek() {
             token.as_ref().map_err(Clone::clone)
         } else {
@@ -425,7 +424,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<Expression<'a>, LustError> {
-        todo!("calm down")
+        // todo!("calm down")
+        let mut tree = TokenTree::new();
+        loop {
+            let token = self.next_token()?.lexeme;
+
+        }
     }
 
     fn parse_expression_list(&mut self) -> Result<Vec<Expression<'a>>, LustError> {
@@ -459,6 +463,8 @@ impl<'a> Iterator for Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{path::Path, fs::read_to_string};
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -475,6 +481,13 @@ mod tests {
         assert_eq!(parser.next(), None);
 
         Ok(())
+    }
+    
+    fn read_lua_file(filename: &str) -> String {
+        let path = format!("./lua/{}.lua", filename);
+        let path = Path::new(&path);
+
+        read_to_string(path).expect(&format!("Should read ./lua/{}.lua", filename))
     }
 
     #[test]
@@ -706,6 +719,17 @@ mod tests {
         )?;
         compare("break", &[Statement::Break])?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn parse_script() -> Result<(), LustError> {
+        let code = read_lua_file("html_generator");
+        let parser = Parser::new(Lexer::new(&code));
+
+        for statement in parser.into_iter() {
+            let statement = statement?;
+        }
         Ok(())
     }
 }

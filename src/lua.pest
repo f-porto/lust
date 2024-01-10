@@ -98,6 +98,107 @@ RawString = ${ "[" ~ PUSH("="*) ~ "[" ~ RawInner ~ "]" ~ POP ~ "]" }
 RawInner = @{ RawChar* }
 RawChar = _{ !("]" ~ PEEK ~ "]") ~ ANY }
 
+//
+
+VarArg = { TripleDot }
+
+Chunk = { Block }
+
+Block = { Statement* ~ ReturnStatement? }
+
+Statement = { Nothing }
+
+Nothing = { Semicolon }
+Assignment = { VariableList ~ Equals ~ ExpressionList }
+Label = { DoubleColon ~ Identifier ~ DoubleColon }
+BreakStatement = { Break }
+GotoStatement = { Goto ~ Identifier }
+DoBlock = { Do ~ Block ~ End }
+WhileLoop = { While ~ Expression ~ Do ~ Block ~ End }
+RepeatLoop = {  Repeat ~ Block ~ Until ~ Expression }
+IfStatement = { If ~ Expression ~ Then ~ Block ~ (Elseif ~ Expression ~ Then ~ Block)* ~ (Else ~ Block)? ~ End }
+NumericalForLoop = { For ~ Identifier ~ Equals ~ Expression ~ Comma ~ Expression ~ (Comma ~ Expression)? ~ Do ~ Block ~ End }
+GenericForLoop = { For ~ IdentifierList ~ Equals ~ ExpressionList ~ Do ~ Block ~ End }
+FunctionDefinition = { Function ~ FunctionName ~ FunctionBody }
+LocalFunctionDefinition = { Local ~ Function ~ Identifier ~ FunctionBody }
+LocalAssignment = { Local ~ AttributeList ~ (Equals ~ ExpressionList)? }
+
+AttributeList = { Identifier ~ Attribute ~ (Comma ~ Identifier ~ Attribute)* }
+Attribute = { (Less ~ Identifier ~ Greater)? }
+
+ReturnStatement = { Return ~ ExpressionList? ~ Semicolon? }
+
+FunctionName = { Identifier ~ (Dot ~ Identifier)* ~ (Colon ~ Identifier)? }
+
+VariableList = { Variable ~ (Comma ~ Variable)* }
+Variable = { Identifier }
+
+IdentifierList = { Identifier ~ (Comma ~ Identifier)* }
+
+ExpressionList = { Expression ~ (Comma ~ Expression)* }
+
+Arguments = { (LeftParenthesis ~ ExpressionList? ~ RightParenthesis) | TableConstructor | String }
+
+FunctionBody = { LeftParenthesis ~ ParameterList? ~ RightParenthesis ~ Block ~ End }
+
+ParameterList = { (IdentifierList ~ (Comma ~ VarArg)?) | TripleDot }
+
+TableConstructor = { LeftBrace ~ FieldList? ~ RightBrace }
+FieldList = { Field ~ (FieldDelimiter ~ Field)* ~ FieldDelimiter? }
+Field = {
+    (LeftBracket ~ Expression ~ RightBracket ~ Equals ~ Expression) |
+    (Identifier ~ Equals ~ Expression) |
+    Expression
+}
+FieldDelimiter = { Comma | Semicolon }
+
+PrefixExp = { Variable | (LeftParenthesis ~ Expression ~ RightParenthesis) }
+
+LambdaDefinition = { Function ~ FunctionBody }
+
+BinaryOperation = _{
+    Addition | Subtraction | Multiplication | Division | IntegerDivision | Modulo | Exponentiation |
+    BooleanOr | BooleanAnd |
+    IsEqual | IsDifferent | IsGreater | IsLess | IsGreaterOrEqual | IsLessOrEqual |
+    BitwiseAnd | BitwiseLeftShift | BitwiseOr | BitwiseRightShift | BitwiseXor |
+    Concatenation
+}
+Addition = { Plus }
+Subtraction = { Minus }
+Multiplication = { Asterisks }
+Division = { Slash }
+IntegerDivision = { DoubleSlash }
+Modulo = { Percent }
+BooleanOr = { Or }
+BooleanAnd = { And }
+IsEqual = { DoubleEquals }
+IsDifferent = { Different }
+IsGreater = { Greater }
+IsLess = { Less }
+IsGreaterOrEqual = { GreaterOrEqual }
+IsLessOrEqual = { LessOrEqual }
+BitwiseOr = { VerticalBar }
+BitwiseAnd = { Ampersand }
+BitwiseXor = { Tilde }
+BitwiseLeftShift = { LeftShift }
+BitwiseRightShift = { RightShift }
+Concatenation = { DoubleDot }
+Exponentiation = { Circumflex }
+
+UnaryOperation = _{ Negation | Length | BitwiseNegation | BooleanNegation }
+Negation = { Minus }
+Length = { Hash }
+BitwiseNegation = { Tilde }
+BooleanNegation = { Not }
+
+Primary = _{
+    Integer | String | Float | Nil | VarArg | TableConstructor | PrefixExp | LambdaDefinition
+}
+
+Atom = _{ UnaryOperation? ~ Primary }
+
+Expression = { Atom ~ (BinaryOperation ~ Atom)* }
+
 // Useful for testing
 Integers = _{ SOI ~ Integer* ~ EOI }
 HexIntegers = _{ SOI ~ HexInteger* ~ EOI }

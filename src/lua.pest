@@ -1,5 +1,11 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
+ShortComment = @{ "--" ~ !("[" ~ "="* ~ "[") ~ (!NEWLINE ~ ANY)* }
+LongComment = @{ "--[" ~ PUSH("="*) ~ "[" ~ LongCommentInner ~ "]" ~ POP ~ "]" }
+LongCommentInner = @{ LongCommentChar* }
+LongCommentChar = _{ !("]" ~ PEEK ~ "]") ~ ANY }
+COMMENT = _{ LongComment | ShortComment }
+
 Plus = @{ "+" }
 Minus = @{ "-" }
 Asterisks = @{ "*" }
@@ -78,31 +84,33 @@ Float = @{ Float1 | Float2 | Float3 }
 
 Integer = @{ "-"? ~ Digit+ }
 
-Identifier = { ("_" | Alpha) ~ ("_" | Alpha | Digit)* }
+Identifier = @{ ("_" | Alpha) ~ ("_" | Alpha | Digit)* }
 
 SqString = ${"'" ~ SqInner ~ "'"}
 SqInner = @{ SqChar* }
-SqChar = _{ !("'" | "\\") ~ ANY | "\\" ~ ANY }
+SqChar = _{ !("'" | NEWLINE | "\\") ~ ANY | "\\" ~ ANY }
 
 DqString = ${"\"" ~ DqInner ~ "\""}
 DqInner = @{ DqChar* }
-DqChar = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
+DqChar = _{ !("\"" | NEWLINE | "\\") ~ ANY | "\\" ~ ANY }
 
 RawString = ${ "[" ~ PUSH("="*) ~ "[" ~ RawInner ~ "]" ~ POP ~ "]" }
 RawInner = @{ RawChar* }
 RawChar = _{ !("]" ~ PEEK ~ "]") ~ ANY }
 
-Integers = { SOI ~ Integer ~ ("," ~ Integer)* ~ EOI }
-HexIntegers = { SOI ~ HexInteger ~ ("," ~ HexInteger)* ~ EOI }
-Floats = { SOI ~ Float ~ ("," ~ Float)* ~ EOI }
-HexFloats = { SOI ~ HexFloat ~ ("," ~ HexFloat)* ~ EOI }
-Identifiers = { SOI ~ Identifier ~ ("," ~ Identifier)* ~ EOI }
-SqStrings = { SOI ~ SqString ~ ("," ~ SqString)* ~ EOI }
-DqStrings = { SOI ~ DqString ~ ("," ~ DqString)* ~ EOI }
-RawStrings = { SOI ~ RawString ~ ("," ~ RawString)* ~ EOI }
+// Useful for testing
+Integers = _{ SOI ~ Integer* ~ EOI }
+HexIntegers = _{ SOI ~ HexInteger* ~ EOI }
+Floats = _{ SOI ~ Float* ~ EOI }
+HexFloats = _{ SOI ~ HexFloat* ~ EOI }
+Identifiers = _{ SOI ~ Identifier* ~ EOI }
+SqStrings = _{ SOI ~ SqString* ~ EOI }
+DqStrings = _{ SOI ~ DqString* ~ EOI }
+RawStrings = _{ SOI ~ RawString* ~ EOI }
 
-Number = { HexFloat | Float | HexInteger | Integer }
-String = { SqString | DqString | RawString }
-Symbol = { Plus | Minus | Asterisks | Slash | Percent | Circumflex | Hash | Ampersand | Tilde | VerticalBar | LeftShift | RightShift | DoubleSlash | DoubleEquals | Different | LessOrEqual | GreaterOrEqual | Less | Greater | Equals | LeftParenthesis | RightParenthesis | LeftBrace | RightBrace | LeftBracket | RightBracket | DoubleColon | Semicolon | Colon | Comma | TripleDot | DoubleDot | Dot }
-Keyword = { And | Break | Do | Else | Elseif | End | False | For | Function | Goto | If | In | Local | Nil | Not | Or | Repeat | Return | Then | True | Until | While }
-All = { SOI ~ (Number | String | Symbol | Keyword)* ~ EOI }
+Number = _{ HexFloat | Float | HexInteger | Integer }
+String = _{ RawString | SqString | DqString }
+Symbol = _{ Plus | Minus | Asterisks | Slash | Percent | Circumflex | Hash | Ampersand | Tilde | VerticalBar | LeftShift | RightShift | DoubleSlash | DoubleEquals | Different | LessOrEqual | GreaterOrEqual | Less | Greater | Equals | LeftParenthesis | RightParenthesis | LeftBrace | RightBrace | LeftBracket | RightBracket | DoubleColon | Semicolon | Colon | Comma | TripleDot | DoubleDot | Dot }
+Keyword = _{ And | Break | Do | Else | Elseif | End | False | For | Function | Goto | If | In | Local | Nil | Not | Or | Repeat | Return | Then | True | Until | While }
+Comment = _{ LongComment | ShortComment }
+All = { SOI ~ (Comment | Number | String | Symbol | Keyword | Identifier)* ~ EOI }

@@ -8,3 +8,13 @@ print1("This execute") -- aaaaaaaaaa
 --[[]] print3("between comments") -- true
 -- -- {}
 --[] table.method
+
+--[===[
+
+ --[==[
+
+ ]==]
+
+]===]
+
+print()

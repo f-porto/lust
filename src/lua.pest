@@ -102,12 +102,32 @@ RawChar = _{ !("]" ~ PEEK ~ "]") ~ ANY }
 
 VarArg = { TripleDot }
 
-Chunk = { Block }
+Chunk = { SOI ~ Block ~ EOI }
 
 Block = { Statement* ~ ReturnStatement? }
 
-Statement = { Nothing }
+Statement = {
+    Nothing |
+    Assignment |
+    FunctionCall |
+    Label |
+    BreakStatement |
+    GotoStatement |
+    DoBlock |
+    WhileLoop |
+    RepeatLoop |
+    IfStatement |
+    NumericalForLoop |
+    GenericForLoop |
+    FunctionDefinition |
+    LocalFunctionDefinition |
+    LocalAssignment
+}
 
+FunctionCall = {
+    (PrefixExp ~ Arguments) |
+    (PrefixExp ~ Colon ~ Identifier ~ Arguments)
+}
 Nothing = { Semicolon }
 Assignment = { VariableList ~ Equals ~ ExpressionList }
 Label = { DoubleColon ~ Identifier ~ DoubleColon }
@@ -131,7 +151,7 @@ ReturnStatement = { Return ~ ExpressionList? ~ Semicolon? }
 FunctionName = { Identifier ~ (Dot ~ Identifier)* ~ (Colon ~ Identifier)? }
 
 VariableList = { Variable ~ (Comma ~ Variable)* }
-Variable = { Identifier }
+Variable = { Identifier | (PrefixExp ~ LeftBrace ~ Expression ~ RightBrace) | (PrefixExp ~ Dot ~ Identifier) }
 
 IdentifierList = { Identifier ~ (Comma ~ Identifier)* }
 
@@ -152,7 +172,14 @@ Field = {
 }
 FieldDelimiter = { Comma | Semicolon }
 
-PrefixExp = { Variable | (LeftParenthesis ~ Expression ~ RightParenthesis) }
+PrefixExpAtom = { Identifier | (LeftParenthesis ~ Expression ~ RightParenthesis) }
+PostfixPrefixExp = {
+    (LeftBrace ~ Expression ~ RightBrace) |
+    (Dot ~ Identifier) |
+    Arguments |
+    (Colon ~ Identifier ~ Arguments)
+}
+PrefixExp = { PrefixExpAtom ~ PostfixPrefixExp* }
 
 LambdaDefinition = { Function ~ FunctionBody }
 

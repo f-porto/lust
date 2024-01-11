@@ -13,6 +13,8 @@ pub enum Expression {
     Integer(i64),
     Float(f64),
     String(String),
+    True,
+    False,
     Nil,
     VarArg,
     Negation {
@@ -147,6 +149,8 @@ impl ExpressionParser {
     pub fn parse_expr(expr_parser: &PrattParser<Rule>, pairs: Pairs<Rule>) -> Expression {
         expr_parser
             .map_primary(|primary| match primary.as_rule() {
+                Rule::True => Expression::True,
+                Rule::False => Expression::False,
                 Rule::VarArg => Expression::VarArg,
                 Rule::Nil => Expression::Nil,
                 Rule::Integer => Expression::Integer(primary.as_str().parse().unwrap()),
@@ -155,7 +159,7 @@ impl ExpressionParser {
                 Rule::DqString => Expression::String(primary.into_inner().as_str().into()),
                 Rule::RawString => Expression::String(primary.into_inner().as_str().into()),
                 Rule::Expression => ExpressionParser::parse_expr(expr_parser, primary.into_inner()),
-                rule => unreachable!("Expected Integer, found {:?}", rule),
+                rule => unreachable!("Expected Integer, found {:?} {}", rule, primary),
             })
             .map_infix(|lhs, op, rhs| match op.as_rule() {
                 Rule::Addition => Expression::Addition {

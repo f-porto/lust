@@ -1,18 +1,30 @@
 use std::io::{stdin, Read};
 
 use lust::{LuaParser, Rule};
-use pest::Parser;
+use pest::{iterators::Pairs, Parser};
+
+fn print_pairs(pairs: Pairs<Rule>, ident: usize) {
+    for pair in pairs {
+        println!(
+            "{}{:?}: {:?}",
+            " ".repeat(ident),
+            pair.as_rule(),
+            pair.as_str()
+        );
+        print_pairs(pair.into_inner(), ident + 2);
+    }
+}
 
 fn main() {
     let mut stdin = stdin().lock();
     let mut content = String::new();
     stdin.read_to_string(&mut content).unwrap();
     let pairs = LuaParser::parse(Rule::Chunk, &content);
-    let Ok(mut pairs) = pairs else {
+    let Ok(pairs) = pairs else {
         println!("{}", pairs.err().unwrap());
         return;
     };
-    println!("{:?}", pairs.next().unwrap().into_inner());
+    print_pairs(pairs, 0);
 
     // while let Ok(size) = stdin.read_line(&mut line) {
     //     if size == 0 {

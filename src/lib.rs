@@ -7,7 +7,7 @@ use pest_derive::Parser;
 #[derive(Debug, Parser)]
 #[grammar = "lua.pest"]
 pub struct LuaParser;
-
+/*
 #[derive(Debug)]
 pub enum Expression {
     Integer(i64),
@@ -266,3 +266,4 @@ impl ExpressionParser {
             .parse(pairs)
     }
 }
+*/

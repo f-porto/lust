@@ -27,17 +27,19 @@ String = _{ RawString | DqString | SqString }
 
 // Number
 Integer = @{ ASCII_DIGIT+ }
+Exponent = @{ ^"e" ~  ("+" | "-")? ~ ASCII_DIGIT+ }
 Float = @{
-    ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ (^"e" ~  ("+" | "-")? ~ ASCII_DIGIT+ )?
-    | "." ~ ASCII_DIGIT+ ~ (^"e" ~  ("+" | "-")? ~ ASCII_DIGIT+ )?
-    | ASCII_DIGIT + ~ ^"e" ~  ("+" | "-")? ~ ASCII_DIGIT+
+    ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ Exponent?
+    | "." ~ ASCII_DIGIT+ ~ Exponent?
+    | ASCII_DIGIT + ~ Exponent
 }
 
 HexInteger = @{ ^"0x" ~ ASCII_HEX_DIGIT+ }
+HexExponent = @{ ^"p" ~  ("+" | "-")? ~ ASCII_HEX_DIGIT+ }
 HexFloat = @{
-    ^"0x" ~ ASCII_HEX_DIGIT+ ~ "." ~ ASCII_HEX_DIGIT* ~ (^"p" ~  ("+" | "-")? ~ ASCII_HEX_DIGIT+ )?
-    | ^"0x" ~ "." ~ ASCII_HEX_DIGIT+ ~ (^"p" ~  ("+" | "-")? ~ ASCII_HEX_DIGIT+ )?
-    | ^"0x" ~ ASCII_HEX_DIGIT + ~ ^"p" ~  ("+" | "-")? ~ ASCII_HEX_DIGIT+
+    ^"0x" ~ ASCII_HEX_DIGIT+ ~ "." ~ ASCII_HEX_DIGIT* ~ HexExponent?
+    | ^"0x" ~ "." ~ ASCII_HEX_DIGIT+ ~ HexExponent?
+    | ^"0x" ~ ASCII_HEX_DIGIT + ~ HexExponent
 }
 
 Number = _{ HexFloat | HexInteger | Float | Integer }
@@ -45,7 +47,7 @@ Number = _{ HexFloat | HexInteger | Float | Integer }
 // Literal
 True = @{ "true" }
 False = @{ "false" }
-Nil = @{ "Nil" }
+Nil = @{ "nil" }
 Literal = _{ String | Number | True | False | Nil }
 
 // Keyword
@@ -64,7 +66,7 @@ Name = @{ !(Keyword ~ !ASCII_ALPHA) ~ Word }
 
 Chunk = _{ SOI ~ Block ~ EOI }
 
-Block = { Statement* ~ ReturnStatement? }
+Block = _{ Statement* ~ ReturnStatement? }
 
 Statement = {
     Empty
@@ -104,12 +106,11 @@ Attribute = { ("<" ~ Name ~ ">")? }
 ReturnStatement = { "return" ~ ExpressionList? ~ ";"? }
 NameList = { Name ~ ("," ~ Name)* }
 FunctionName = { Name ~ ("." ~ Name)* ~ (":" ~ Name)? }
-VariableList = { PrefixExpression ~ ("," ~ PrefixExpression)* }
-// VariableList = { Variable ~ ("," ~ Variable)* }
-// Variable = {
-//     Name
-//     | PrimaryExp ~ ( Selector | CallSuffix )* ~ Selector
-// }
+VariableList = { Variable ~ ("," ~ Variable)* }
+Variable = {
+    PrimaryExp ~ ( CallSuffix* ~ Selector )+
+    | Name
+}
 FunctionBody = { "(" ~ ParameterList? ~ ")" ~ Block ~ "end" }
 ParameterList = {
     NameList ~ ("," ~ "...")?
@@ -122,15 +123,14 @@ Arguments = {
     | String
     | Table
 }
-FunctionCall = { PrefixExpression }
-// FunctionCall = {
-//     PrimaryExp ~ ( Selector | CallSuffix )* ~ Arguments
-//     | PrimaryExp ~ ( Selector | CallSuffix )* ~ ":" ~ Name ~ Arguments
-// }
+FunctionCall = {
+    PrimaryExp ~ ( Selector* ~ CallSuffix )+
+}
 
 // PrefixExpression
-PrefixExpression  =  { PrimaryExp ~ ( Selector | CallSuffix )* }
+PrefixExpression  =  { PrimaryExp ~ PExp* }
 PrimaryExp =  { Name | "(" ~ Expression ~ ")" }
+PExp = _{ Selector | CallSuffix }
 Selector = { "[" ~ Expression ~ "]" | "." ~ Name }
 CallSuffix = { Arguments | ":" ~ Name ~ Arguments }
 
@@ -144,9 +144,10 @@ Field = {
     | Name ~ "=" ~  Expression
     | Expression
 }
-FieldDelimeter = { "," | ";" }
+FieldDelimeter = _{ "," | ";" }
 
-Primary = { Literal | "..." | Lambda | Table | PrefixExpression }
+VarArg = { "..." }
+Primary = { Literal | VarArg | Lambda | Table | PrefixExpression }
 Atom = { UnaryOperator? ~ Primary }
 Expression = { Atom ~ (BinaryOperator ~ Atom)* }
 

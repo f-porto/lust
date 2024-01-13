@@ -6,77 +6,74 @@ use pest::Parser;
 use pretty_assertions::assert_eq;
 
 fn check(expected: &[&str], rule: Rule) -> Result<(), Box<dyn Error>> {
-    let text = expected.join(" ");
-    let pairs = LuaParser::parse(rule, &text);
-    let Ok(pairs) = pairs else {
-        panic!("{}", pairs.err().unwrap());
-    };
-    let pairs: Vec<_> = pairs.into_iter().collect();
-
-    println!("{:?}", pairs);
-    assert_eq!(pairs.len() - 1, expected.len());
-    for i in 0..expected.len() {
-        assert_eq!(pairs[i].as_str(), expected[i]);
+    for x in expected {
+        let pairs = LuaParser::parse(rule, x);
+        let Ok(pairs) = pairs else {
+            panic!("{}", pairs.err().unwrap());
+        };
+        let pairs: Vec<_> = pairs.into_iter().collect();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(&pairs[0].as_str(), x);
     }
     Ok(())
 }
 
 #[test]
 fn read_integers() -> Result<(), Box<dyn Error>> {
-    let integers = ["0", "12345", "-0", "-123455"];
-    check(&integers, Rule::Integers)
+    let integers = ["0", "12345"];
+    check(&integers, Rule::Integer)
 }
 
 #[test]
 fn read_hex_integers() -> Result<(), Box<dyn Error>> {
-    let integers = ["0x0", "0x123A5", "-0xF", "-0x123CD55"];
-    check(&integers, Rule::HexIntegers)
+    let integers = ["0x0", "0x123A5"];
+    check(&integers, Rule::HexInteger)
 }
 
 #[test]
 fn read_floats() -> Result<(), Box<dyn Error>> {
     let floats = [
         "12.",
-        "-34.",
+        "34.",
         ".02",
-        "-.12",
+        ".12",
         "34.e-3",
         "54.e45",
-        "-43.e23",
-        "-6.e-1",
+        "43.e23",
+        "6.e-1",
         "7e3",
-        "-7e3",
+        "7e3",
         "324.1231",
-        "-432.423e34",
+        "432.423e34",
         "123e+43",
         "34e1",
     ];
-    check(&floats, Rule::Floats)
+    check(&floats, Rule::Float)
 }
 
 #[test]
 fn read_hex_floats() -> Result<(), Box<dyn Error>> {
     let floats = [
         "0x12.",
-        "-0xf4.",
+        "0xf4.",
         "0x.a2",
-        "-0x.12E",
+        "0x.12E",
         "0x34.p-3",
         "0x54.pc5",
-        "-0x43f.p23",
-        "-0x6.p-1",
+        "0x43f.p23",
+        "0x6.p-1",
         "0x7p3",
-        "-0x7p3",
+        "0x7p3",
         "0xf324.1231",
-        "-0x432.423p3a4",
+        "0x432.423p3a4",
     ];
-    check(&floats, Rule::HexFloats)
+    check(&floats, Rule::HexFloat)
 }
 
 #[test]
 fn read_identifiers() -> Result<(), Box<dyn Error>> {
     let ids = ["asads", "a", "_", "as8ads", "_232"];
-    check(&ids, Rule::Identifiers)
+    check(&ids, Rule::Name)
 }
 
 #[test]
@@ -90,7 +87,7 @@ fn read_sq_strings() -> Result<(), Box<dyn Error>> {
         r#"'\''"#,
         r#"'\\'"#,
     ];
-    check(&strings, Rule::SqStrings)
+    check(&strings, Rule::SqString)
 }
 
 #[test]
@@ -104,7 +101,7 @@ fn read_dq_strings() -> Result<(), Box<dyn Error>> {
         r#""\"""#,
         r#""\\""#,
     ];
-    check(&strings, Rule::DqStrings)
+    check(&strings, Rule::DqString)
 }
 
 #[test]
@@ -121,5 +118,5 @@ fn read_raw_strings() -> Result<(), Box<dyn Error>> {
 
             ]===]"#,
     ];
-    check(&strings, Rule::RawStrings)
+    check(&strings, Rule::RawString)
 }

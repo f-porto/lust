@@ -1,1 +1,1 @@
-io.write()
+a.b.c.d()["dsfd"].c:dfs(23, 54)[7] = 0

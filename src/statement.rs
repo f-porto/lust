@@ -1,5 +1,5 @@
 use crate::{
-    expressions::Expression,
+    expression::Expression,
     prefix_expression::{CallSuffix, PrefixExpression, Selector},
 };
 

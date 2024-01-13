@@ -1,4 +1,4 @@
-use crate::expressions::Expression;
+use crate::expression::Expression;
 
 #[derive(Debug)]
 pub struct PrefixExpression {

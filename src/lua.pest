@@ -1,0 +1,187 @@
+WHITESPACE = _{ " " | "\n" | "\t" | "\r" }
+
+ShortComment = @{ "--" ~ (!NEWLINE ~ ANY)* }
+LongComment = @{ "--[" ~ PUSH("="*) ~ "[" ~ (!("]" ~ PEEK ~ "]") ~ ANY)* ~ "]" ~ POP ~ "]" }
+COMMENT = _{ LongComment | ShortComment }
+
+// Strings
+SqString = ${ "'" ~ SqInner ~ "'" }
+SqInner = @{ SqChar* }
+SqChar = {
+    !("'" | "\\" | NEWLINE) ~ ANY
+    | "\\" ~ ANY
+}
+
+DqString = ${ "\"" ~ DqInner ~ "\"" }
+DqInner = @{ DqChar* }
+DqChar = {
+    !("\"" | "\\" | NEWLINE) ~ ANY
+    | "\\" ~ ANY
+}
+
+RawString = ${"[" ~ PUSH("="*) ~ "[" ~ RawInner ~  "]" ~ POP ~ "]" }
+RawInner = @{ RawChar* }
+RawChar = { !("]" ~ PEEK ~ "]") ~ ANY }
+
+String = _{ RawString | DqString | SqString }
+
+// Number
+Integer = @{ ASCII_DIGIT+ }
+Exponent = @{ ^"e" ~  ("+" | "-")? ~ ASCII_DIGIT+ }
+Float = @{
+    ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ Exponent?
+    | "." ~ ASCII_DIGIT+ ~ Exponent?
+    | ASCII_DIGIT + ~ Exponent
+}
+
+HexInteger = @{ ^"0x" ~ ASCII_HEX_DIGIT+ }
+HexExponent = @{ ^"p" ~  ("+" | "-")? ~ ASCII_HEX_DIGIT+ }
+HexFloat = @{
+    ^"0x" ~ ASCII_HEX_DIGIT+ ~ "." ~ ASCII_HEX_DIGIT* ~ HexExponent?
+    | ^"0x" ~ "." ~ ASCII_HEX_DIGIT+ ~ HexExponent?
+    | ^"0x" ~ ASCII_HEX_DIGIT + ~ HexExponent
+}
+
+Number = _{ HexFloat | HexInteger | Float | Integer }
+
+// Literal
+True = @{ "true" }
+False = @{ "false" }
+Nil = @{ "nil" }
+Literal = _{ String | Number | True | False | Nil }
+
+// Keyword
+Keyword = @{
+    "true" | "false" | "nil"
+    | "function" | "local" | "return"
+    | "do" | "end"
+    | "repeat" | "until" | "while" | "for" | "in" | "break" | "goto"
+    | "if" | "elseif" | "else" | "then"
+    | "and" | "or" | "not"
+}
+
+// Name
+Word = @{ ("_" | ASCII_ALPHA) ~ ("_" | ASCII_ALPHANUMERIC)* }
+Name = @{ !(Keyword ~ !ASCII_ALPHA) ~ Word }
+
+Chunk = _{ SOI ~ Block ~ EOI }
+
+Block = _{ Statement* ~ ReturnStatement? }
+
+Statement = {
+    Empty
+    | Label
+    | Break
+    | Goto
+    | Do
+    | While
+    | Reapeat
+    | If
+    | NumericalFor
+    | GenericFor
+    | FunctionDefinition
+    | LocalFunctionDefinition
+    | LocalAssignment
+    | Assigment
+    | FunctionCall
+}
+
+Empty = { ";" }
+Label = { "::" ~ Name ~ "::" }
+Break = { "break" }
+Goto = { "goto" ~ Name }
+Do = { "do" ~ Block ~ "end" }
+While = { "while" ~ Expression ~ "do" ~ Block ~  "end" }
+Reapeat = { "repeat" ~ Block ~ "until" ~ Expression }
+If = { "if" ~ Expression ~ "then" ~ Block ~ ("elseif" ~ Expression ~ "then" ~ Block)* ~ ("else" ~ Block)? ~ "end" }
+NumericalFor = { "for" ~ Name ~ "=" ~ Expression ~ "," ~ Expression ~ ("," ~ Expression)? ~ "do" ~ Block ~ "end" }
+GenericFor = { "for" ~ NameList ~ "in" ~ ExpressionList ~ "do" ~ Block ~ "end" }
+FunctionDefinition = { "function" ~ FunctionName ~ FunctionBody }
+LocalFunctionDefinition = { "local" ~ "function" ~ FunctionName ~ FunctionBody }
+LocalAssignment = { "local" ~ AttributeList ~ ("=" ~ ExpressionList)? }
+Assigment = { VariableList ~ "=" ~ ExpressionList }
+
+AttributeList = { Name ~ Attribute ~ ("," ~ Name ~ Attribute)* }
+Attribute = { ("<" ~ Name ~ ">")? }
+ReturnStatement = { "return" ~ ExpressionList? ~ ";"? }
+NameList = { Name ~ ("," ~ Name)* }
+FunctionName = { Name ~ ("." ~ Name)* ~ (":" ~ Name)? }
+VariableList = { Variable ~ ("," ~ Variable)* }
+Variable = {
+    PrimaryExp ~ ( CallSuffix* ~ Selector )+
+    | Name
+}
+FunctionBody = { "(" ~ ParameterList? ~ ")" ~ Block ~ "end" }
+ParameterList = {
+    NameList ~ ("," ~ "...")?
+    | "..."
+}
+ExpressionList = { Expression ~ ("," ~ Expression)* }
+
+Arguments = {
+    "(" ~ ExpressionList? ~ ")"
+    | String
+    | Table
+}
+FunctionCall = {
+    PrimaryExp ~ ( Selector* ~ CallSuffix )+
+}
+
+// PrefixExpression
+PrefixExpression  =  { PrimaryExp ~ PExp* }
+PrimaryExp =  { Name | "(" ~ Expression ~ ")" }
+PExp = _{ Selector | CallSuffix }
+Selector = { "[" ~ Expression ~ "]" | "." ~ Name }
+CallSuffix = { Arguments | ":" ~ Name ~ Arguments }
+
+// Expression
+Lambda = { "function" ~ FunctionBody }
+
+Table = { "{" ~ FieldList? ~ "}" }
+FieldList = { Field ~ (FieldDelimeter ~ Field)* ~ FieldDelimeter? }
+Field = {
+    "[" ~ Expression ~ "]" ~ "=" ~ Expression
+    | Name ~ "=" ~  Expression
+    | Expression
+}
+FieldDelimeter = _{ "," | ";" }
+
+VarArg = { "..." }
+Primary = { Literal | VarArg | Lambda | Table | PrefixExpression }
+Atom = { UnaryOperator? ~ Primary }
+Expression = { Atom ~ (BinaryOperator ~ Atom)* }
+
+BinaryOperator = _{
+    Addition | Subtraction | Multiplication | Division | IntegerDivision | Modulo | Exponentiation |
+    BooleanOr | BooleanAnd |
+    Equals | Different | Greater | Less | GreaterOrEqual | LessOrEqual |
+    BitwiseAnd | BitwiseLeftShift | BitwiseOr | BitwiseRightShift | BitwiseXor |
+    Concatenation
+}
+Addition = { "+" }
+Subtraction = { "-" }
+Multiplication = { "*" }
+Division = { "/" }
+IntegerDivision = { "//" }
+Modulo = { "%" }
+BooleanOr = { "or" }
+BooleanAnd = { "and" }
+Equals = { "==" }
+Different = { "~=" }
+Greater = { ">" }
+Less = { "<" }
+GreaterOrEqual = { ">=" }
+LessOrEqual = { "<=" }
+BitwiseOr = { "|" }
+BitwiseAnd = { "&" }
+BitwiseXor = { "~" }
+BitwiseLeftShift = { "<<" }
+BitwiseRightShift = { ">>" }
+Concatenation = { ".." }
+Exponentiation = { "^" }
+
+UnaryOperator = _{ Negation | Length | BitwiseNegation | BooleanNegation }
+Negation = { "-" }
+Length = { "#" }
+BitwiseNegation = { "~" }
+BooleanNegation = { "not" }

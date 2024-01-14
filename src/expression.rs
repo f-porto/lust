@@ -1,6 +1,12 @@
-use pest::{pratt_parser::{PrattParser, Op, Assoc}, iterators::Pairs};
+use pest::{
+    iterators::Pairs,
+    pratt_parser::{Assoc, Op, PrattParser},
+};
 
-use crate::Rule;
+use crate::{
+    prefix_expression::{parse_prefix_expression, PrefixExpression, Primary},
+    Rule,
+};
 
 #[derive(Debug)]
 pub enum Expression {
@@ -11,18 +17,11 @@ pub enum Expression {
     False,
     Nil,
     VarArg,
-    Negation {
-        expr: Box<Expression>,
-    },
-    BooleanNegation {
-        expr: Box<Expression>,
-    },
-    BitwiseNegation {
-        expr: Box<Expression>,
-    },
-    Length {
-        expr: Box<Expression>,
-    },
+    Negation(Box<Expression>),
+    BooleanNegation(Box<Expression>),
+    BitwiseNegation(Box<Expression>),
+    Length(Box<Expression>),
+    PrefixExpression(PrefixExpression),
     Addition {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
@@ -152,6 +151,10 @@ impl ExpressionParser {
                 Rule::SqString => Expression::String(primary.into_inner().as_str().into()),
                 Rule::DqString => Expression::String(primary.into_inner().as_str().into()),
                 Rule::RawString => Expression::String(primary.into_inner().as_str().into()),
+                Rule::PrefixExpression => Expression::PrefixExpression(parse_prefix_expression(
+                    expr_parser,
+                    primary.into_inner(),
+                )),
                 Rule::Expression => ExpressionParser::parse_expr(expr_parser, primary.into_inner()),
                 rule => unreachable!("Expected primary, found {:?} {}", rule, primary),
             })
@@ -243,18 +246,10 @@ impl ExpressionParser {
                 rule => unreachable!("Expected infix operation, found {:?}", rule),
             })
             .map_prefix(|op, rhs| match op.as_rule() {
-                Rule::Negation => Expression::Negation {
-                    expr: Box::new(rhs),
-                },
-                Rule::BooleanNegation => Expression::BooleanNegation {
-                    expr: Box::new(rhs),
-                },
-                Rule::BitwiseNegation => Expression::BitwiseNegation {
-                    expr: Box::new(rhs),
-                },
-                Rule::Length => Expression::Length {
-                    expr: Box::new(rhs),
-                },
+                Rule::Negation => Expression::Negation(Box::new(rhs)),
+                Rule::BooleanNegation => Expression::BooleanNegation(Box::new(rhs)),
+                Rule::BitwiseNegation => Expression::BitwiseNegation(Box::new(rhs)),
+                Rule::Length => Expression::Length(Box::new(rhs)),
                 rule => unreachable!("Expected prefix operation, found {:?}", rule),
             })
             .parse(pairs)

@@ -1,3 +1,4 @@
+pub mod ast;
 mod expression;
 mod prefix_expression;
 mod statement;

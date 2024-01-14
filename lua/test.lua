@@ -1,1 +1,9 @@
-a.b.c.d()["dsfd"].c:dfs(23, 54)[7] = 0
+a.b.c["fsdf"][d](10, false).b = 10
+
+b = 10
+a = (function (c)
+    return b + c
+end)(20)
+
+
+return nil

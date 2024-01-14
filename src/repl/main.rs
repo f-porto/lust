@@ -1,19 +1,7 @@
 use std::io::{stdin, Read};
 
-use lust::{LuaParser, Rule};
-use pest::{iterators::Pairs, Parser};
-
-fn print_pairs(pairs: Pairs<Rule>, ident: usize) {
-    for pair in pairs {
-        println!(
-            "{}{:?}: {:?}",
-            " ".repeat(ident),
-            pair.as_rule(),
-            pair.as_str()
-        );
-        print_pairs(pair.into_inner(), ident + 2);
-    }
-}
+use lust::{ast::ASTBuilder, LuaParser, Rule};
+use pest::Parser;
 
 fn main() {
     let mut stdin = stdin().lock();
@@ -24,7 +12,7 @@ fn main() {
         println!("{}", pairs.err().unwrap());
         return;
     };
-    print_pairs(pairs, 0);
+    ASTBuilder::new().build_ast(pairs);
 
     // while let Ok(size) = stdin.read_line(&mut line) {
     //     if size == 0 {

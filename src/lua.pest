@@ -68,7 +68,7 @@ Chunk = _{ SOI ~ Block ~ EOI }
 
 Block = _{ Statement* ~ ReturnStatement? }
 
-Statement = {
+Statement = _{
     Empty
     | Label
     | Break
@@ -82,7 +82,7 @@ Statement = {
     | FunctionDefinition
     | LocalFunctionDefinition
     | LocalAssignment
-    | Assigment
+    | Assignment
     | FunctionCall
 }
 
@@ -99,7 +99,7 @@ GenericFor = { "for" ~ NameList ~ "in" ~ ExpressionList ~ "do" ~ Block ~ "end" }
 FunctionDefinition = { "function" ~ FunctionName ~ FunctionBody }
 LocalFunctionDefinition = { "local" ~ "function" ~ FunctionName ~ FunctionBody }
 LocalAssignment = { "local" ~ AttributeList ~ ("=" ~ ExpressionList)? }
-Assigment = { VariableList ~ "=" ~ ExpressionList }
+Assignment = { VariableList ~ "=" ~ ExpressionList }
 
 AttributeList = { Name ~ Attribute ~ ("," ~ Name ~ Attribute)* }
 Attribute = { ("<" ~ Name ~ ">")? }
@@ -129,16 +129,25 @@ FunctionCall = {
 
 // PrefixExpression
 PrefixExpression  =  { PrimaryExp ~ PExp* }
-PrimaryExp =  { Name | "(" ~ Expression ~ ")" }
+PrimaryExp =  {
+    Name
+    | "(" ~ Expression ~ ")"
+}
 PExp = _{ Selector | CallSuffix }
-Selector = { "[" ~ Expression ~ "]" | "." ~ Name }
-CallSuffix = { Arguments | ":" ~ Name ~ Arguments }
+Selector = {
+    "[" ~ Expression ~ "]"
+    | "." ~ Name
+}
+CallSuffix = {
+    Arguments
+    | ":" ~ Name ~ Arguments
+}
 
 // Expression
 Lambda = { "function" ~ FunctionBody }
 
 Table = { "{" ~ FieldList? ~ "}" }
-FieldList = { Field ~ (FieldDelimeter ~ Field)* ~ FieldDelimeter? }
+FieldList = { Field ~ ( FieldDelimeter ~ Field )* ~ FieldDelimeter? }
 Field = {
     "[" ~ Expression ~ "]" ~ "=" ~ Expression
     | Name ~ "=" ~  Expression
@@ -147,8 +156,8 @@ Field = {
 FieldDelimeter = _{ "," | ";" }
 
 VarArg = { "..." }
-Primary = { Literal | VarArg | Lambda | Table | PrefixExpression }
-Atom = { UnaryOperator? ~ Primary }
+Primary = _{ Literal | VarArg | Lambda | Table | PrefixExpression }
+Atom = _{ UnaryOperator? ~ Primary }
 Expression = { Atom ~ (BinaryOperator ~ Atom)* }
 
 BinaryOperator = _{

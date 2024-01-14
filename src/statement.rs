@@ -5,8 +5,8 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Block {
-    statements: Vec<Statement>,
-    return_statement: Option<Return>,
+    pub statements: Vec<Statement>,
+    pub return_statement: Option<Return>,
 }
 
 #[derive(Debug)]
@@ -71,20 +71,20 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub struct LocalVariable {
-    name: String,
-    attribute: Option<String>,
+    pub name: String,
+    pub attribute: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct Parameters {
-    name_list: Vec<String>,
-    var_arg: bool,
+    pub name_list: Vec<String>,
+    pub var_arg: bool,
 }
 
 #[derive(Debug)]
 pub struct FunctionName {
-    names: Vec<String>,
-    method: Option<String>,
+    pub names: Vec<String>,
+    pub method: Option<String>,
 }
 
 #[derive(Debug)]

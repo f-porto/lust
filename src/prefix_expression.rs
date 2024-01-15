@@ -5,7 +5,7 @@ use pest::{
 
 use crate::{
     expression::{Expression, ExpressionParser},
-    print_pair, print_pairs, Rule,
+    Rule,
 };
 
 #[derive(Debug)]

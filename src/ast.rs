@@ -1,5 +1,3 @@
-use std::{env::var, io::Empty};
-
 use pest::{
     iterators::{Pair, Pairs},
     pratt_parser::PrattParser,
@@ -7,27 +5,14 @@ use pest::{
 
 use crate::{
     expression::{Expression, ExpressionParser},
-    prefix_expression::{Argument, CallSuffix, PExpAction, PrefixExpression, Primary, Selector, self, parse_prefix_expression},
-    statement::{Block, Statement, Variable},
+    prefix_expression::{
+        self, parse_prefix_expression, Argument, CallSuffix, PExpAction, PrefixExpression, Primary,
+        Selector,
+    },
+    print_pair, print_pairs,
+    statement::{self, Block, Parameters, Statement, Variable, FunctionName},
     Rule,
 };
-
-fn print_pair(pair: &Pair<Rule>) {
-    println!(
-        "{:?} ({}): {:?}",
-        pair.as_rule(),
-        pair.as_node_tag().unwrap_or("x"),
-        pair.as_str()
-    );
-}
-
-fn print_pairs(pairs: Pairs<Rule>, ident: usize) {
-    for pair in pairs {
-        print!("{}", " ".repeat(ident));
-        print_pair(&pair);
-        print_pairs(pair.into_inner(), ident + 2);
-    }
-}
 
 pub struct ASTBuilder {
     expr_parser: PrattParser<Rule>,
@@ -41,12 +26,14 @@ impl ASTBuilder {
     }
 
     pub fn build_ast(&self, pairs: Pairs<Rule>) -> Block {
+        let mut statements = vec![];
         for pair in pairs {
-            self.build_statement(pair);
+            let statement = self.build_statement(pair);
+            statements.push(statement);
         }
 
         Block {
-            statements: vec![Statement::Empty],
+            statements,
             return_statement: None,
         }
     }
@@ -54,7 +41,10 @@ impl ASTBuilder {
     fn build_statement(&self, pair: Pair<Rule>) -> Statement {
         match pair.as_rule() {
             Rule::Assignment => self.build_assignment(pair),
-            _ => Statement::Empty,
+            Rule::FunctionCall => self.build_function_call(pair),
+            Rule::FunctionDefinition => self.build_function_definition(pair),
+            Rule::EOI => Statement::Empty,
+            _ => unreachable!("Expected statement, found {:?}", pair),
         }
     }
 
@@ -64,8 +54,19 @@ impl ASTBuilder {
 }
 
 impl ASTBuilder {
-    fn build_variable(&self, mut pairs: Pairs<Rule>) -> Variable {
-        let first = pairs.next().unwrap();
+    fn build_function_call(&self, pair: Pair<Rule>) -> Statement {
+        let mut prefix_exp = parse_prefix_expression(&self.expr_parser, pair.into_inner());
+        let last = prefix_exp.actions.pop().unwrap();
+        let PExpAction::Call(call) = last else {
+            unreachable!("Expected call suffix, found {:?}", last);
+        };
+        Statement::FunctionCall { prefix_exp, call }
+    }
+}
+
+impl ASTBuilder {
+    fn build_variable(&self, pairs: Pairs<Rule>) -> Variable {
+        let first = pairs.peek().unwrap();
         if first.as_rule() == Rule::Name {
             return Variable::Name(first.as_str().into());
         }
@@ -82,11 +83,46 @@ impl ASTBuilder {
 
     fn build_assignment(&self, pair: Pair<Rule>) -> Statement {
         let mut pairs = pair.into_inner();
-        let variables = pairs.next().unwrap();
-        for variable in variables.into_inner() {
-            self.build_variable(variable.into_inner());
+
+        let variable_list = pairs
+            .next()
+            .unwrap()
+            .into_inner()
+            .map(|x| self.build_variable(x.into_inner()))
+            .collect();
+
+        let expr_list = pairs
+            .next()
+            .unwrap()
+            .into_inner()
+            .map(|x| self.parse_expr(x.into_inner()))
+            .collect();
+
+        Statement::Assignment {
+            variable_list,
+            expr_list,
         }
-        pairs.next().unwrap();
+    }
+}
+
+pub fn parse_function_body(
+    ast_builder: &ASTBuilder,
+    pair: Pair<Rule>,
+) -> (Option<Parameters>, Block) {
+    todo!()
+}
+
+impl ASTBuilder {
+    fn parse_function_name(&self, pair: Pair<Rule>) -> FunctionName {
+        print_pair(&pair);
+        print_pairs(pair.into_inner(), 2);
+        todo!()
+    }
+
+    fn build_function_definition(&self, pair: Pair<Rule>) -> Statement {
+        let mut pairs = pair.into_inner();
+        self.parse_function_name(pairs.next().unwrap());
+        parse_function_body(&self, pairs.next().unwrap());
         todo!()
     }
 }

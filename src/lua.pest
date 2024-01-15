@@ -105,7 +105,8 @@ AttributeList = { Name ~ Attribute ~ ("," ~ Name ~ Attribute)* }
 Attribute = { ("<" ~ Name ~ ">")? }
 ReturnStatement = { "return" ~ ExpressionList? ~ ";"? }
 NameList = { Name ~ ("," ~ Name)* }
-FunctionName = { Name ~ ("." ~ Name)* ~ (":" ~ Name)? }
+FunctionName = { Name ~ ("." ~ Name)* ~ MethodName? }
+MethodName = { ":" ~ Name }
 VariableList = { Variable ~ ("," ~ Variable)* }
 Variable = {
     PrimaryExp ~ ( CallSuffix* ~ Selector )+
@@ -113,8 +114,8 @@ Variable = {
 }
 FunctionBody = { "(" ~ ParameterList? ~ ")" ~ Block ~ "end" }
 ParameterList = {
-    NameList ~ ("," ~ "...")?
-    | "..."
+    NameList ~ ("," ~ VarArg)?
+    | VarArg
 }
 ExpressionList = { Expression ~ ("," ~ Expression)* }
 

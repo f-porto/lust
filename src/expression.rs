@@ -5,7 +5,8 @@ use pest::{
 
 use crate::{
     prefix_expression::{parse_prefix_expression, PrefixExpression, Primary},
-    Rule,
+    statement::{Block, Parameters},
+    Rule, ast::ASTBuilder,
 };
 
 #[derive(Debug)]
@@ -22,6 +23,10 @@ pub enum Expression {
     BitwiseNegation(Box<Expression>),
     Length(Box<Expression>),
     PrefixExpression(PrefixExpression),
+    Lambda {
+        parameters: Option<Parameters>,
+        body: Block,
+    },
     Addition {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
@@ -151,6 +156,7 @@ impl ExpressionParser {
                 Rule::SqString => Expression::String(primary.into_inner().as_str().into()),
                 Rule::DqString => Expression::String(primary.into_inner().as_str().into()),
                 Rule::RawString => Expression::String(primary.into_inner().as_str().into()),
+                Rule::Lambda => todo!(),
                 Rule::PrefixExpression => Expression::PrefixExpression(parse_prefix_expression(
                     expr_parser,
                     primary.into_inner(),

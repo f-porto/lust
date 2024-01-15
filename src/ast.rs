@@ -5,12 +5,8 @@ use pest::{
 
 use crate::{
     expression::{Expression, ExpressionParser},
-    prefix_expression::{
-        self, parse_prefix_expression, Argument, CallSuffix, PExpAction, PrefixExpression, Primary,
-        Selector,
-    },
-    print_pair, print_pairs,
-    statement::{self, Block, Parameters, Statement, Variable, FunctionName},
+    prefix_expression::{parse_prefix_expression, PExpAction},
+    statement::{Block, FunctionName, Parameters, Statement, Variable},
     Rule,
 };
 
@@ -105,24 +101,87 @@ impl ASTBuilder {
     }
 }
 
+fn parse_parameter_list(pair: Pair<Rule>) -> Parameters {
+    let mut pairs = pair.into_inner();
+    let Some(first) = pairs.next() else {
+        return Parameters {
+            name_list: vec![],
+            var_arg: false,
+        };
+    };
+    let name_list;
+    match first.as_rule() {
+        Rule::VarArg => {
+            return Parameters {
+                name_list: vec![],
+                var_arg: true,
+            }
+        }
+        Rule::NameList => name_list = first.into_inner().map(|x| x.as_str().into()).collect(),
+        _ => unreachable!("Expected parameter, found {:?}", first),
+    };
+    let var_arg = pairs.next().is_some();
+    Parameters { name_list, var_arg }
+}
+
 pub fn parse_function_body(
     ast_builder: &ASTBuilder,
     pair: Pair<Rule>,
 ) -> (Option<Parameters>, Block) {
-    todo!()
+    let mut pairs = pair.into_inner();
+    let Some(first) = pairs.next() else {
+        return (
+            None,
+            Block {
+                statements: vec![],
+                return_statement: None,
+            },
+        );
+    };
+    let parameters;
+    match first.as_rule() {
+        Rule::ParameterList => parameters = parse_parameter_list(first),
+        Rule::Block => {
+            let block = ast_builder.build_ast(first.into_inner());
+            return (None, block);
+        }
+        _ => unreachable!("Expected function body, found {:?}", first),
+    };
+    if pairs.peek().is_none() {
+        return (
+            Some(parameters),
+            Block {
+                statements: vec![],
+                return_statement: None,
+            },
+        );
+    };
+    let block = ast_builder.build_ast(pairs);
+    (Some(parameters), block)
 }
 
 impl ASTBuilder {
     fn parse_function_name(&self, pair: Pair<Rule>) -> FunctionName {
-        print_pair(&pair);
-        print_pairs(pair.into_inner(), 2);
-        todo!()
+        let mut method: Option<String> = None;
+        let mut names = vec![];
+        for pair in pair.into_inner() {
+            match pair.as_rule() {
+                Rule::Name => names.push(pair.as_str().into()),
+                Rule::MethodName => method = Some(pair.as_str().into()),
+                _ => unreachable!("Expected name, found {:?}", pair),
+            }
+        }
+        FunctionName { names, method }
     }
 
     fn build_function_definition(&self, pair: Pair<Rule>) -> Statement {
         let mut pairs = pair.into_inner();
-        self.parse_function_name(pairs.next().unwrap());
-        parse_function_body(&self, pairs.next().unwrap());
-        todo!()
+        let function_name = self.parse_function_name(pairs.next().unwrap());
+        let (parameters, body) = parse_function_body(&self, pairs.next().unwrap());
+        Statement::FunctionDefinition {
+            function_name,
+            parameters,
+            body,
+        }
     }
 }

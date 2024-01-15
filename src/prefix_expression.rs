@@ -5,7 +5,7 @@ use pest::{
 
 use crate::{
     expression::{Expression, ExpressionParser},
-    Rule,
+    print_pair, print_pairs, Rule,
 };
 
 #[derive(Debug)]
@@ -55,19 +55,35 @@ fn parse_selector(expr_parser: &PrattParser<Rule>, pair: Pair<Rule>) -> Selector
     }
 }
 
-fn parse_args(pair: Pair<Rule>) -> Argument {
-    todo!()
+fn parse_args(expr_parser: &PrattParser<Rule>, pair: Pair<Rule>) -> Argument {
+    let Some(pair) = pair.into_inner().next() else {
+        return Argument::List(vec![]);
+    };
+    match pair.as_rule() {
+        Rule::DqString => Argument::String(pair.into_inner().as_str().into()),
+        Rule::SqString => Argument::String(pair.into_inner().as_str().into()),
+        Rule::RawString => Argument::String(pair.into_inner().as_str().into()),
+        Rule::Table => Argument::Table,
+        Rule::ExpressionList => {
+            let exp_list = pair
+                .into_inner()
+                .map(|x| ExpressionParser::parse_expr(expr_parser, x.into_inner()))
+                .collect();
+            Argument::List(exp_list)
+        }
+        _ => unreachable!("Expected argument found, {:?}", pair),
+    }
 }
 
-fn parse_call_suffix(mut pairs: Pairs<Rule>) -> CallSuffix {
+fn parse_call_suffix(expr_parser: &PrattParser<Rule>, mut pairs: Pairs<Rule>) -> CallSuffix {
     let first = pairs.next().unwrap();
     match first.as_rule() {
-        Rule::Arguments => CallSuffix::Simple(parse_args(first)),
+        Rule::Arguments => CallSuffix::Simple(parse_args(expr_parser, first)),
         Rule::Name => {
             let arg = pairs.next().unwrap();
             CallSuffix::Method {
                 name: first.as_str().into(),
-                argument: parse_args(arg),
+                argument: parse_args(expr_parser, arg),
             }
         }
         _ => unreachable!("Expected call suffix, found {:?}", first),
@@ -80,7 +96,7 @@ fn parse_p_exp(expr_parser: &PrattParser<Rule>, pair: Pair<Rule>) -> PExpAction 
             expr_parser,
             pair.into_inner().next().unwrap(),
         )),
-        Rule::CallSuffix => PExpAction::Call(parse_call_suffix(pair.into_inner())),
+        Rule::CallSuffix => PExpAction::Call(parse_call_suffix(expr_parser, pair.into_inner())),
         _ => unreachable!("Expected prefix expression, found {:?}", pair),
     }
 }

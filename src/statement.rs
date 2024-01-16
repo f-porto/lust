@@ -10,7 +10,13 @@ pub struct Block {
 }
 
 #[derive(Debug)]
-pub struct Return(Vec<Expression>);
+pub struct Return(pub Option<Vec<Expression>>);
+
+#[derive(Debug)]
+pub struct If {
+    pub condition: Expression,
+    pub block: Block,
+}
 
 #[derive(Debug)]
 pub enum Statement {
@@ -36,9 +42,7 @@ pub enum Statement {
         condition: Expression,
     },
     If {
-        condition: Expression,
-        block: Block,
-        else_if: Vec<Block>,
+        ifs: Vec<If>,
         r#else: Option<Block>,
     },
     NumericalFor {
@@ -46,10 +50,11 @@ pub enum Statement {
         initial: Expression,
         limit: Expression,
         step: Option<Expression>,
+        block: Block,
     },
     GenericFor {
         variables: Vec<String>,
-        exp_list: Vec<Expression>,
+        expr_list: Vec<Expression>,
         block: Block,
     },
     FunctionDefinition {
@@ -64,7 +69,7 @@ pub enum Statement {
     },
     LocalVariables {
         variables: Vec<LocalVariable>,
-        esp_list: Option<Vec<Expression>>,
+        expr_list: Option<Vec<Expression>>,
     },
     Return(Return),
 }

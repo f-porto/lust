@@ -10,6 +10,7 @@ path = "./src/repl/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4.0"
 pest = "2.7.6"
 pest_derive = "2.7.6"
 

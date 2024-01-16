@@ -154,7 +154,7 @@ fn parse_parameters(mut pairs: Pairs<Rule>) -> Parameters {
     Parameters { name_list, var_arg }
 }
 
-fn parse_function_body(mut pairs: Pairs<Rule>) -> (Option<Parameters>, Block) {
+pub fn parse_function_body(mut pairs: Pairs<Rule>) -> (Option<Parameters>, Block) {
     match pairs.peek().unwrap().as_rule() {
         Rule::Block => {
             let block = build_ast(&mut pairs);

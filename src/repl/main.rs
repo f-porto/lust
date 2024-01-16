@@ -1,6 +1,6 @@
 use std::io::{stdin, Read};
 
-use lust::{ast::ASTBuilder, LuaParser, Rule};
+use lust::{ast::build_ast, LuaParser, Rule};
 use pest::Parser;
 
 fn main() {
@@ -12,6 +12,6 @@ fn main() {
         println!("{}", pairs.err().unwrap());
         return;
     };
-    let program =  ASTBuilder::new().build_ast(pairs);
+    let program = build_ast(pairs);
     println!("{:?}", program);
 }

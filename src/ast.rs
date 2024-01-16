@@ -4,184 +4,242 @@ use pest::{
 };
 
 use crate::{
-    expression::{Expression, ExpressionParser},
-    prefix_expression::{parse_prefix_expression, PExpAction},
-    statement::{Block, FunctionName, Parameters, Statement, Variable},
+    expression::{parse_expr, Expression},
+    prefix_expression::PExpAction,
+    print_pair, print_pairs,
+    statement::{Block, FunctionName, If, LocalVariable, Parameters, Return, Statement, Variable},
     Rule,
 };
 
-pub struct ASTBuilder {
-    expr_parser: PrattParser<Rule>,
-}
-
-impl ASTBuilder {
-    pub fn new() -> Self {
-        Self {
-            expr_parser: ExpressionParser::new(),
-        }
-    }
-
-    pub fn build_ast(&self, pairs: Pairs<Rule>) -> Block {
-        let mut statements = vec![];
-        for pair in pairs {
-            let statement = self.build_statement(pair);
-            statements.push(statement);
-        }
-
-        Block {
-            statements,
-            return_statement: None,
-        }
-    }
-
-    fn build_statement(&self, pair: Pair<Rule>) -> Statement {
+pub fn build_ast(mut pairs: Pairs<Rule>) -> Block {
+    let mut block = Block {
+        statements: vec![],
+        return_statement: None,
+    };
+    let Some(pair) = pairs.next() else {
+        return block;
+    };
+    for pair in pair.into_inner() {
         match pair.as_rule() {
-            Rule::Assignment => self.build_assignment(pair),
-            Rule::FunctionCall => self.build_function_call(pair),
-            Rule::FunctionDefinition => self.build_function_definition(pair),
-            Rule::EOI => Statement::Empty,
+            Rule::Statement => block.statements.push(parse_statement(pair.into_inner())),
+            Rule::ReturnStatement => {
+                block.return_statement = Some(parse_return_statement(pair.into_inner()))
+            }
             _ => unreachable!("Expected statement, found {:?}", pair),
-        }
+        };
     }
+    return block;
+}
 
-    fn parse_expr(&self, pairs: Pairs<Rule>) -> Expression {
-        ExpressionParser::parse_expr(&self.expr_parser, pairs)
+fn parse_statement(mut pairs: Pairs<Rule>) -> Statement {
+    let pair = pairs.next().unwrap();
+    match pair.as_rule() {
+        Rule::Empty => Statement::Empty,
+        Rule::Label => parse_label(pair.into_inner()),
+        Rule::Break => Statement::Break,
+        Rule::Goto => parse_goto(pair.into_inner()),
+        Rule::Do => parse_do(pair.into_inner()),
+        Rule::While => parse_while(pair.into_inner()),
+        Rule::Repeat => parse_repeat(pair.into_inner()),
+        Rule::If => parse_if(pair.into_inner()),
+        Rule::NumericalFor => parse_numerical_for(pair.into_inner()),
+        Rule::GenericFor => parse_generic_for(pair.into_inner()),
+        Rule::FunctionDefinition => parse_function_definition(pair.into_inner()),
+        Rule::LocalFunctionDefinition => parse_local_function_definition(pair.into_inner()),
+        Rule::Assignment => parse_assignment(pair.into_inner()),
+        Rule::LocalAssignment => parse_local_assignment(pair.into_inner()),
+        Rule::FunctionCall => parse_function_call(pair.into_inner()),
+        _ => unreachable!("Expected statement, found {:?}", pair),
     }
 }
 
-impl ASTBuilder {
-    fn build_function_call(&self, pair: Pair<Rule>) -> Statement {
-        let mut prefix_exp = parse_prefix_expression(&self.expr_parser, pair.into_inner());
-        let last = prefix_exp.actions.pop().unwrap();
-        let PExpAction::Call(call) = last else {
-            unreachable!("Expected call suffix, found {:?}", last);
-        };
-        Statement::FunctionCall { prefix_exp, call }
-    }
+fn parse_return_statement(mut pairs: Pairs<Rule>) -> Return {
+    Return(
+        pairs
+            .next()
+            .map(|x| x.into_inner().map(|y| parse_expr(y.into_inner())).collect()),
+    )
 }
 
-impl ASTBuilder {
-    fn build_variable(&self, pairs: Pairs<Rule>) -> Variable {
-        let first = pairs.peek().unwrap();
-        if first.as_rule() == Rule::Name {
-            return Variable::Name(first.as_str().into());
-        }
-        let mut prefix_exp = parse_prefix_expression(&self.expr_parser, pairs);
-        let last = prefix_exp.actions.pop().unwrap();
-        let PExpAction::Selector(selector) = last else {
-            unreachable!("Expected selector, found {:?}", last);
-        };
-        return Variable::Selector {
-            prefix_exp,
-            selector,
-        };
-    }
+fn parse_function_call(mut pairs: Pairs<Rule>) -> Statement {
+    todo!("function call");
+}
 
-    fn build_assignment(&self, pair: Pair<Rule>) -> Statement {
-        let mut pairs = pair.into_inner();
-
-        let variable_list = pairs
+fn parse_attribute_list(mut pairs: Pairs<Rule>) -> Vec<LocalVariable> {
+    let mut variables = vec![];
+    while let Some(name) = pairs.next() {
+        let name = name.as_str().into();
+        let attribute = pairs
             .next()
             .unwrap()
             .into_inner()
-            .map(|x| self.build_variable(x.into_inner()))
-            .collect();
-
-        let expr_list = pairs
             .next()
-            .unwrap()
-            .into_inner()
-            .map(|x| self.parse_expr(x.into_inner()))
-            .collect();
+            .map(|x| x.as_str().into());
+        variables.push(LocalVariable { name, attribute })
+    }
+    variables
+}
 
-        Statement::Assignment {
-            variable_list,
-            expr_list,
-        }
+fn parse_local_assignment(mut pairs: Pairs<Rule>) -> Statement {
+    let variables = parse_attribute_list(pairs.next().unwrap().into_inner());
+    let expr_list = pairs
+        .next()
+        .map(|x| x.into_inner().map(|y| parse_expr(y.into_inner())).collect());
+    Statement::LocalVariables {
+        variables,
+        expr_list,
     }
 }
 
-fn parse_parameter_list(pair: Pair<Rule>) -> Parameters {
-    let mut pairs = pair.into_inner();
-    let Some(first) = pairs.next() else {
+fn parse_assignment(mut pairs: Pairs<Rule>) -> Statement {
+    print_pairs(pairs);
+    todo!("assignment");
+}
+
+fn parse_function_name(mut pairs: Pairs<Rule>) -> FunctionName {
+    let mut names = vec![];
+    let mut method = None;
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::Name => names.push(pair.as_str().into()),
+            Rule::MethodName => method = Some(pair.into_inner().next().unwrap().as_str().into()),
+            _ => unreachable!("Expected name, found {:?}", pair),
+        }
+    }
+    FunctionName { names, method }
+}
+
+fn parse_parameters(mut pairs: Pairs<Rule>) -> Parameters {
+    let pair = pairs.next().unwrap();
+    if pair.as_rule() == Rule::VarArg {
         return Parameters {
             name_list: vec![],
-            var_arg: false,
+            var_arg: true,
         };
-    };
-    let name_list;
-    match first.as_rule() {
-        Rule::VarArg => {
-            return Parameters {
-                name_list: vec![],
-                var_arg: true,
-            }
-        }
-        Rule::NameList => name_list = first.into_inner().map(|x| x.as_str().into()).collect(),
-        _ => unreachable!("Expected parameter, found {:?}", first),
-    };
+    }
+    let name_list = pair.into_inner().map(|x| x.as_str().into()).collect();
     let var_arg = pairs.next().is_some();
     Parameters { name_list, var_arg }
 }
 
-pub fn parse_function_body(
-    ast_builder: &ASTBuilder,
-    pair: Pair<Rule>,
-) -> (Option<Parameters>, Block) {
-    let mut pairs = pair.into_inner();
-    let Some(first) = pairs.next() else {
-        return (
-            None,
-            Block {
-                statements: vec![],
-                return_statement: None,
-            },
-        );
-    };
-    let parameters;
-    match first.as_rule() {
-        Rule::ParameterList => parameters = parse_parameter_list(first),
+fn parse_function_body(mut pairs: Pairs<Rule>) -> (Option<Parameters>, Block) {
+    match pairs.peek().unwrap().as_rule() {
         Rule::Block => {
-            let block = ast_builder.build_ast(first.into_inner());
+            let block = build_ast(pairs);
             return (None, block);
         }
-        _ => unreachable!("Expected function body, found {:?}", first),
-    };
-    if pairs.peek().is_none() {
-        return (
-            Some(parameters),
-            Block {
-                statements: vec![],
-                return_statement: None,
-            },
-        );
-    };
-    let block = ast_builder.build_ast(pairs);
+        _ => {}
+    }
+    let parameters = parse_parameters(pairs.next().unwrap().into_inner());
+    let block = build_ast(pairs);
     (Some(parameters), block)
 }
 
-impl ASTBuilder {
-    fn parse_function_name(&self, pair: Pair<Rule>) -> FunctionName {
-        let mut method: Option<String> = None;
-        let mut names = vec![];
-        for pair in pair.into_inner() {
-            match pair.as_rule() {
-                Rule::Name => names.push(pair.as_str().into()),
-                Rule::MethodName => method = Some(pair.as_str().into()),
-                _ => unreachable!("Expected name, found {:?}", pair),
-            }
-        }
-        FunctionName { names, method }
+fn parse_local_function_definition(mut pairs: Pairs<Rule>) -> Statement {
+    let name = pairs.next().unwrap().as_str().into();
+    let (parameters, body) = parse_function_body(pairs.next().unwrap().into_inner());
+    Statement::LocalFunctionDefinition {
+        name,
+        parameters,
+        body,
     }
+}
 
-    fn build_function_definition(&self, pair: Pair<Rule>) -> Statement {
-        let mut pairs = pair.into_inner();
-        let function_name = self.parse_function_name(pairs.next().unwrap());
-        let (parameters, body) = parse_function_body(&self, pairs.next().unwrap());
-        Statement::FunctionDefinition {
-            function_name,
-            parameters,
-            body,
-        }
+fn parse_function_definition(mut pairs: Pairs<Rule>) -> Statement {
+    let function_name = parse_function_name(pairs.next().unwrap().into_inner());
+    let (parameters, body) = parse_function_body(pairs.next().unwrap().into_inner());
+    Statement::FunctionDefinition {
+        function_name,
+        parameters,
+        body,
     }
+}
+
+fn parse_if(mut pairs: Pairs<Rule>) -> Statement {
+    let mut ifs = vec![];
+    let mut r#else = None;
+    loop {
+        let Some(first) = pairs.next() else {
+            break;
+        };
+        if first.as_rule() == Rule::Block {
+            r#else = Some(build_ast(first.into_inner()));
+            break;
+        }
+        let condition = parse_expr(first.into_inner());
+        let block = build_ast(pairs.next().unwrap().into_inner());
+        ifs.push(If { condition, block });
+    }
+    Statement::If { ifs, r#else }
+}
+
+fn parse_generic_for(mut pairs: Pairs<Rule>) -> Statement {
+    let variables = pairs
+        .next()
+        .unwrap()
+        .into_inner()
+        .map(|x| x.as_str().into())
+        .collect();
+    let expr_list = pairs
+        .next()
+        .unwrap()
+        .into_inner()
+        .map(|x| parse_expr(x.into_inner()))
+        .collect();
+    let block = build_ast(pairs);
+    Statement::GenericFor {
+        variables,
+        expr_list,
+        block,
+    }
+}
+
+fn parse_numerical_for(mut pairs: Pairs<Rule>) -> Statement {
+    let control = pairs.next().unwrap().as_str().into();
+    let initial = parse_expr(pairs.next().unwrap().into_inner());
+    let limit = parse_expr(pairs.next().unwrap().into_inner());
+    let mut step = None;
+    match pairs.peek().unwrap().as_rule() {
+        Rule::Expression => step = Some(parse_expr(pairs.next().unwrap().into_inner())),
+        _ => {}
+    }
+    let block = build_ast(pairs);
+    Statement::NumericalFor {
+        control,
+        initial,
+        limit,
+        step,
+        block,
+    }
+}
+
+fn parse_repeat(mut pairs: Pairs<Rule>) -> Statement {
+    let block = pairs.next().unwrap();
+    let block = build_ast(block.into_inner());
+    let condition = pairs.next().unwrap();
+    let condition = parse_expr(condition.into_inner());
+    Statement::Repeat { block, condition }
+}
+
+fn parse_while(mut pairs: Pairs<Rule>) -> Statement {
+    let condition = pairs.next().unwrap();
+    let condition = parse_expr(condition.into_inner());
+    let block = pairs.next().unwrap();
+    let block = build_ast(block.into_inner());
+    Statement::While { condition, block }
+}
+
+fn parse_do(pairs: Pairs<Rule>) -> Statement {
+    let block = build_ast(pairs);
+    Statement::Do(block)
+}
+
+fn parse_label(mut pairs: Pairs<Rule>) -> Statement {
+    let name = pairs.next().unwrap().as_str().into();
+    Statement::Label(name)
+}
+
+fn parse_goto(mut pairs: Pairs<Rule>) -> Statement {
+    let name = pairs.next().unwrap().as_str().into();
+    Statement::Goto(name)
 }

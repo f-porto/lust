@@ -9,7 +9,6 @@ use pest_derive::Parser;
 #[grammar = "lua.pest"]
 pub struct LuaParser;
 
-
 fn print_pair(pair: &Pair<Rule>) {
     println!(
         "{:?} ({}): {:?}",
@@ -19,10 +18,17 @@ fn print_pair(pair: &Pair<Rule>) {
     );
 }
 
-fn print_pairs(pairs: Pairs<Rule>, ident: usize) {
+fn h_print_pairs(pairs: Pairs<Rule>, ident: usize) {
     for pair in pairs {
         print!("{}", " ".repeat(ident));
         print_pair(&pair);
-        print_pairs(pair.into_inner(), ident + 2);
+        h_print_pairs(pair.into_inner(), ident + 2);
+    }
+}
+
+fn print_pairs(pairs: Pairs<Rule>) {
+    for pair in pairs {
+        print_pair(&pair);
+        h_print_pairs(pair.into_inner(), 2);
     }
 }

@@ -4,7 +4,7 @@ use pest::{
 };
 
 use crate::{
-    prefix_expression::PrefixExpression,
+    prefix_expression::{PrefixExpression, parse_prefix_expr},
     statement::{Block, Parameters},
     Rule,
 };
@@ -155,7 +155,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
             Rule::DqString => Expression::String(primary.into_inner().as_str().into()),
             Rule::RawString => Expression::String(primary.into_inner().as_str().into()),
             Rule::Lambda => todo!(),
-            Rule::PrefixExpression => todo!(),
+            Rule::PrefixExpression => Expression::PrefixExpression(parse_prefix_expr(primary.into_inner())),
             Rule::Expression => parse_expr(primary.into_inner()),
             rule => unreachable!("Expected primary, found {:?} {}", rule, primary),
         })

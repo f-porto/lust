@@ -62,20 +62,20 @@ Keyword = @{
 
 // Name
 Word = @{ ("_" | ASCII_ALPHA) ~ ("_" | ASCII_ALPHANUMERIC)* }
-Name = @{ !(Keyword ~ !ASCII_ALPHA) ~ Word }
+Name = @{ !(Keyword ~ !(ASCII_ALPHA | "_")) ~ Word }
 
 Chunk = _{ SOI ~ Block ~ EOI }
 
-Block = _{ Statement* ~ ReturnStatement? }
+Block = { Statement* ~ ReturnStatement? }
 
-Statement = _{
+Statement = {
     Empty
     | Label
     | Break
     | Goto
     | Do
     | While
-    | Reapeat
+    | Repeat
     | If
     | NumericalFor
     | GenericFor
@@ -92,12 +92,12 @@ Break = { "break" }
 Goto = { "goto" ~ Name }
 Do = { "do" ~ Block ~ "end" }
 While = { "while" ~ Expression ~ "do" ~ Block ~  "end" }
-Reapeat = { "repeat" ~ Block ~ "until" ~ Expression }
+Repeat = { "repeat" ~ Block ~ "until" ~ Expression }
 If = { "if" ~ Expression ~ "then" ~ Block ~ ("elseif" ~ Expression ~ "then" ~ Block)* ~ ("else" ~ Block)? ~ "end" }
 NumericalFor = { "for" ~ Name ~ "=" ~ Expression ~ "," ~ Expression ~ ("," ~ Expression)? ~ "do" ~ Block ~ "end" }
 GenericFor = { "for" ~ NameList ~ "in" ~ ExpressionList ~ "do" ~ Block ~ "end" }
 FunctionDefinition = { "function" ~ FunctionName ~ FunctionBody }
-LocalFunctionDefinition = { "local" ~ "function" ~ FunctionName ~ FunctionBody }
+LocalFunctionDefinition = { "local" ~ "function" ~ Name ~ FunctionBody }
 LocalAssignment = { "local" ~ AttributeList ~ ("=" ~ ExpressionList)? }
 Assignment = { VariableList ~ "=" ~ ExpressionList }
 

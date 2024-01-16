@@ -11,6 +11,13 @@ use crate::{
 };
 
 #[derive(Debug)]
+pub enum Field {
+    ExprKey { key: Expression, value: Expression },
+    NameKey { name: String, value: Expression },
+    Expr(Expression),
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Integer(i64),
     Float(f64),
@@ -19,6 +26,7 @@ pub enum Expression {
     False,
     Nil,
     VarArg,
+    Table(Vec<Field>),
     Negation(Box<Expression>),
     BooleanNegation(Box<Expression>),
     BitwiseNegation(Box<Expression>),
@@ -143,6 +151,39 @@ lazy_static::lazy_static! {
         .op(Op::infix(Rule::Exponentiation, Assoc::Right));
 }
 
+fn parse_field(mut pairs: Pairs<Rule>) -> Field {
+    let first = pairs.next().unwrap();
+    match first.as_rule() {
+        Rule::Name => {
+            let name = first.as_str().into();
+            let second = pairs.next().unwrap();
+            let value = parse_expr(second.into_inner());
+            Field::NameKey { name, value }
+        }
+        Rule::Expression => {
+            let first = parse_expr(first.into_inner());
+            if let Some(second) = pairs.next() {
+                let value = parse_expr(second.into_inner());
+                Field::ExprKey { key: first, value }
+            } else {
+                Field::Expr(first)
+            }
+        }
+        _ => unreachable!("Expected field, found {:?}", first),
+    }
+}
+
+fn parse_table(mut pairs: Pairs<Rule>) -> Expression {
+    let Some(pair) = pairs.next() else {
+        return Expression::Table(vec![]);
+    };
+    let fields = pair
+        .into_inner()
+        .map(|x| parse_field(x.into_inner()))
+        .collect();
+    Expression::Table(fields)
+}
+
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
     EXPR_PARSER
         .map_primary(|primary| match primary.as_rule() {
@@ -164,6 +205,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
                 Expression::PrefixExpression(parse_prefix_expr(primary.into_inner()))
             }
             Rule::Expression => parse_expr(primary.into_inner()),
+            Rule::Table => parse_table(primary.into_inner()),
             rule => unreachable!("Expected primary, found {:?} {}", rule, primary),
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {

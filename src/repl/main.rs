@@ -8,10 +8,10 @@ fn main() {
     let mut content = String::new();
     stdin.read_to_string(&mut content).unwrap();
     let pairs = LuaParser::parse(Rule::Chunk, &content);
-    let Ok(pairs) = pairs else {
+    let Ok(mut pairs) = pairs else {
         println!("{}", pairs.err().unwrap());
         return;
     };
-    let program = build_ast(pairs);
+    let program = build_ast(&mut pairs);
     println!("{:?}", program);
 }

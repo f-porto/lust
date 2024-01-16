@@ -1,17 +1,13 @@
-use pest::{
-    iterators::{Pair, Pairs},
-    pratt_parser::PrattParser,
-};
+use pest::iterators::Pairs;
 
 use crate::{
-    expression::{parse_expr, Expression},
-    prefix_expression::PExpAction,
-    print_pair, print_pairs,
+    expression::parse_expr,
+    prefix_expression::{parse_prefix_expr, PExprAction},
     statement::{Block, FunctionName, If, LocalVariable, Parameters, Return, Statement, Variable},
     Rule,
 };
 
-pub fn build_ast(mut pairs: Pairs<Rule>) -> Block {
+pub fn build_ast(pairs: &mut Pairs<Rule>) -> Block {
     let mut block = Block {
         statements: vec![],
         return_statement: None,
@@ -61,8 +57,13 @@ fn parse_return_statement(mut pairs: Pairs<Rule>) -> Return {
     )
 }
 
-fn parse_function_call(mut pairs: Pairs<Rule>) -> Statement {
-    todo!("function call");
+fn parse_function_call(pairs: Pairs<Rule>) -> Statement {
+    let mut prefix_exp = parse_prefix_expr(pairs);
+    let last = prefix_exp.actions.pop().unwrap();
+    let PExprAction::Call(call) = last else {
+        unreachable!("Expected call suffix, found {:?}", last);
+    };
+    Statement::FunctionCall { prefix_exp, call }
 }
 
 fn parse_attribute_list(mut pairs: Pairs<Rule>) -> Vec<LocalVariable> {
@@ -91,12 +92,43 @@ fn parse_local_assignment(mut pairs: Pairs<Rule>) -> Statement {
     }
 }
 
-fn parse_assignment(mut pairs: Pairs<Rule>) -> Statement {
-    print_pairs(pairs);
-    todo!("assignment");
+fn parse_variable(mut pairs: Pairs<Rule>) -> Variable {
+    let pair = pairs.peek().unwrap();
+    if pair.as_rule() == Rule::Name {
+        pairs.next();
+        return Variable::Name(pair.as_str().into());
+    }
+    let mut prefix_expr = parse_prefix_expr(pairs);
+    let last = prefix_expr.actions.pop().unwrap();
+    let PExprAction::Selector(selector) = last else {
+        unreachable!("Expected selector, found {:?}", last);
+    };
+    Variable::Selector {
+        prefix_expr,
+        selector,
+    }
 }
 
-fn parse_function_name(mut pairs: Pairs<Rule>) -> FunctionName {
+fn parse_assignment(mut pairs: Pairs<Rule>) -> Statement {
+    let variable_list = pairs
+        .next()
+        .unwrap()
+        .into_inner()
+        .map(|x| parse_variable(x.into_inner()))
+        .collect();
+    let expr_list = pairs
+        .next()
+        .unwrap()
+        .into_inner()
+        .map(|x| parse_expr(x.into_inner()))
+        .collect();
+    Statement::Assignment {
+        variable_list,
+        expr_list,
+    }
+}
+
+fn parse_function_name(pairs: Pairs<Rule>) -> FunctionName {
     let mut names = vec![];
     let mut method = None;
     for pair in pairs {
@@ -125,13 +157,13 @@ fn parse_parameters(mut pairs: Pairs<Rule>) -> Parameters {
 fn parse_function_body(mut pairs: Pairs<Rule>) -> (Option<Parameters>, Block) {
     match pairs.peek().unwrap().as_rule() {
         Rule::Block => {
-            let block = build_ast(pairs);
+            let block = build_ast(&mut pairs);
             return (None, block);
         }
         _ => {}
     }
     let parameters = parse_parameters(pairs.next().unwrap().into_inner());
-    let block = build_ast(pairs);
+    let block = build_ast(&mut pairs);
     (Some(parameters), block)
 }
 
@@ -159,15 +191,16 @@ fn parse_if(mut pairs: Pairs<Rule>) -> Statement {
     let mut ifs = vec![];
     let mut r#else = None;
     loop {
-        let Some(first) = pairs.next() else {
+        let Some(first) = pairs.peek() else {
             break;
         };
         if first.as_rule() == Rule::Block {
-            r#else = Some(build_ast(first.into_inner()));
+            r#else = Some(build_ast(&mut pairs));
             break;
         }
+        let first = pairs.next().unwrap();
         let condition = parse_expr(first.into_inner());
-        let block = build_ast(pairs.next().unwrap().into_inner());
+        let block = build_ast(&mut pairs);
         ifs.push(If { condition, block });
     }
     Statement::If { ifs, r#else }
@@ -186,7 +219,7 @@ fn parse_generic_for(mut pairs: Pairs<Rule>) -> Statement {
         .into_inner()
         .map(|x| parse_expr(x.into_inner()))
         .collect();
-    let block = build_ast(pairs);
+    let block = build_ast(&mut pairs);
     Statement::GenericFor {
         variables,
         expr_list,
@@ -203,7 +236,7 @@ fn parse_numerical_for(mut pairs: Pairs<Rule>) -> Statement {
         Rule::Expression => step = Some(parse_expr(pairs.next().unwrap().into_inner())),
         _ => {}
     }
-    let block = build_ast(pairs);
+    let block = build_ast(&mut pairs);
     Statement::NumericalFor {
         control,
         initial,
@@ -214,8 +247,7 @@ fn parse_numerical_for(mut pairs: Pairs<Rule>) -> Statement {
 }
 
 fn parse_repeat(mut pairs: Pairs<Rule>) -> Statement {
-    let block = pairs.next().unwrap();
-    let block = build_ast(block.into_inner());
+    let block = build_ast(&mut pairs);
     let condition = pairs.next().unwrap();
     let condition = parse_expr(condition.into_inner());
     Statement::Repeat { block, condition }
@@ -224,13 +256,12 @@ fn parse_repeat(mut pairs: Pairs<Rule>) -> Statement {
 fn parse_while(mut pairs: Pairs<Rule>) -> Statement {
     let condition = pairs.next().unwrap();
     let condition = parse_expr(condition.into_inner());
-    let block = pairs.next().unwrap();
-    let block = build_ast(block.into_inner());
+    let block = build_ast(&mut pairs);
     Statement::While { condition, block }
 }
 
-fn parse_do(pairs: Pairs<Rule>) -> Statement {
-    let block = build_ast(pairs);
+fn parse_do(mut pairs: Pairs<Rule>) -> Statement {
+    let block = build_ast(&mut pairs);
     Statement::Do(block)
 }
 

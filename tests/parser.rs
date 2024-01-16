@@ -1,7 +1,7 @@
 use std::{error::Error, fs};
 
 use lust::{LuaParser, Rule};
-use pest::{Parser, iterators::Pairs};
+use pest::{iterators::Pairs, Parser};
 use pretty_assertions::*;
 
 fn print_pairs(pairs: Pairs<Rule>, ident: usize) {

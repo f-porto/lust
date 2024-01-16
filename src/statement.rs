@@ -96,7 +96,7 @@ pub struct FunctionName {
 pub enum Variable {
     Name(String),
     Selector {
-        prefix_exp: PrefixExpression,
+        prefix_expr: PrefixExpression,
         selector: Selector,
     },
 }

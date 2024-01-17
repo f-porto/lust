@@ -1,8 +1,8 @@
 use pest::iterators::Pairs;
 
 use crate::{
-    expression::{parse_expr, Expression},
-    Rule,
+    parser::expression::{parse_expr, Expression},
+    parser::Rule,
 };
 
 #[derive(Debug)]

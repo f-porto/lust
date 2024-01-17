@@ -1,6 +1,6 @@
 use crate::{
-    expression::Expression,
-    prefix_expression::{CallSuffix, PrefixExpression, Selector},
+    parser::expression::Expression,
+    parser::prefix_expression::{CallSuffix, PrefixExpression, Selector},
 };
 
 #[derive(Debug)]

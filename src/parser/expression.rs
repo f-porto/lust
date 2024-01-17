@@ -4,10 +4,10 @@ use pest::{
 };
 
 use crate::{
-    ast::parse_function_body,
-    prefix_expression::{parse_prefix_expr, PrefixExpression},
-    statement::{Block, Parameters},
-    Rule,
+    parser::ast::parse_function_body,
+    parser::prefix_expression::{parse_prefix_expr, PrefixExpression},
+    parser::statement::{Block, Parameters},
+    parser::Rule,
 };
 
 #[derive(Debug)]

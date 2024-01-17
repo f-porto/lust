@@ -1,6 +1,6 @@
 use std::io::{stdin, Read};
 
-use lust::{ast::build_ast, LuaParser, Rule};
+use lust::parser::{ast::build_ast, LuaParser, Rule};
 use pest::Parser;
 
 fn main() {

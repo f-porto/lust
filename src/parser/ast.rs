@@ -1,11 +1,14 @@
 use pest::iterators::Pairs;
 
 use crate::{
-    expression::parse_expr,
-    prefix_expression::{parse_prefix_expr, PExprAction},
-    statement::{Block, FunctionName, If, LocalVariable, Parameters, Return, Statement, Variable},
-    Rule,
+    parser::prefix_expression::{parse_prefix_expr, PExprAction},
+    parser::statement::{
+        Block, FunctionName, If, LocalVariable, Parameters, Return, Statement, Variable,
+    },
+    parser::Rule,
 };
+
+use super::expression::parse_expr;
 
 pub fn build_ast(pairs: &mut Pairs<Rule>) -> Block {
     let mut block = Block {

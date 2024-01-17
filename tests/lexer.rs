@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use lust::{LuaParser, Rule};
+use lust::parser::{LuaParser, Rule};
 use pest::Parser;
 
 use pretty_assertions::assert_eq;

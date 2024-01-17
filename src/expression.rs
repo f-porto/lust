@@ -206,7 +206,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
             }
             Rule::Expression => parse_expr(primary.into_inner()),
             Rule::Table => parse_table(primary.into_inner()),
-            rule => unreachable!("Expected primary, found {:?} {}", rule, primary),
+            _ => unreachable!("Expected primary, found {:?}", primary),
         })
         .map_infix(|lhs, op, rhs| match op.as_rule() {
             Rule::Addition => Expression::Addition {
@@ -293,14 +293,14 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             },
-            rule => unreachable!("Expected infix operation, found {:?}", rule),
+            _ => unreachable!("Expected infix operation, found {:?}", op),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
             Rule::Negation => Expression::Negation(Box::new(rhs)),
             Rule::BooleanNegation => Expression::BooleanNegation(Box::new(rhs)),
             Rule::BitwiseNegation => Expression::BitwiseNegation(Box::new(rhs)),
             Rule::Length => Expression::Length(Box::new(rhs)),
-            rule => unreachable!("Expected prefix operation, found {:?}", rule),
+            _ => unreachable!("Expected prefix operation, found {:?}", op),
         })
         .parse(pairs)
 }

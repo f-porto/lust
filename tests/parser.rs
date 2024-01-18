@@ -176,7 +176,7 @@ fn markov() -> Result<(), Box<dyn Error>> {
         return_statement: None,
     };
 
-    // assert_eq!(ast, expected);
+    assert_eq!(ast.statements[0], expected.statements[0]);
 
     println!("{:?}", ast);
     Ok(())

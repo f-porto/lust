@@ -1,7 +1,7 @@
 pub mod ast;
-mod expression;
-mod prefix_expression;
-mod statement;
+pub mod expression;
+pub mod prefix_expression;
+pub mod statement;
 
 use pest::iterators::{Pair, Pairs};
 use pest_derive::Parser;

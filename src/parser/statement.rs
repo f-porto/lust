@@ -3,22 +3,22 @@ use crate::{
     parser::prefix_expression::{CallSuffix, PrefixExpression, Selector},
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Block {
     pub statements: Vec<Statement>,
     pub return_statement: Option<Return>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Return(pub Option<Vec<Expression>>);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct If {
     pub condition: Expression,
     pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     Empty,
     Assignment {
@@ -74,25 +74,25 @@ pub enum Statement {
     Return(Return),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LocalVariable {
     pub name: String,
     pub attribute: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Parameters {
     pub name_list: Vec<String>,
     pub var_arg: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FunctionName {
     pub names: Vec<String>,
     pub method: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Variable {
     Name(String),
     Selector {

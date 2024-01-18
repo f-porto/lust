@@ -5,38 +5,38 @@ use crate::{
     parser::Rule,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PrefixExpression {
     pub primary: Primary,
     pub actions: Vec<PExprAction>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Primary {
     Name(String),
     Expression(Box<Expression>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Argument {
     List(Vec<Expression>),
     String(String),
     Table,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CallSuffix {
     Simple(Argument),
     Method { name: String, argument: Argument },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Selector {
     Dot(String),
     Key(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PExprAction {
     Selector(Selector),
     Call(CallSuffix),

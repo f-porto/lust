@@ -1,6 +1,6 @@
 use std::io::{stdin, Read};
 
-use lust::{parser::{ast::build_ast, LuaParser, Rule}, semantic::symbol_table::{SymbolTable, self}};
+use lust::{parser::{ast::build_ast, LuaParser, Rule}, interpreter::Interpreter};
 use pest::Parser;
 
 fn main() {
@@ -13,6 +13,8 @@ fn main() {
         return;
     };
     let program = build_ast(&mut pairs);
-    let symbol_table = SymbolTable::new(&program);
-    println!("{:?}", symbol_table);
+    // let symbol_table = SymbolTable::new(&program);
+    let mut interpreter = Interpreter::new(&program);
+    interpreter.interpret();
+    println!("{:?}", interpreter.scopes[0]);
 }

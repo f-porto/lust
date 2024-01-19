@@ -42,6 +42,7 @@ enum Value {
     Nil,
     Bool(bool),
     Integer(i64),
+    Float(f64),
     String(String),
     Table(Table),
     Lambda { parameters: Parameters, body: Block },
@@ -51,18 +52,37 @@ impl<'a> Interpreter<'a> {
     pub fn new(program: &'a Block) -> Self {
         Self {
             program,
-            scopes: vec![Scope::new()],
+            scopes: vec![],
         }
     }
 
     pub fn interpret(&mut self) {
-        for statement in self.program.statements.iter() {
+        self.evaluate_block(self.program);
+    }
+
+    fn evaluate_block(&mut self, block: &Block) {
+        self.scopes.push(Scope::new());
+        for statement in block.statements.iter() {
             match statement {
                 Statement::LocalVariables { .. } => self.evaluate_local_variables(statement),
                 Statement::Assignment { .. } => self.evaluate_global_variables(statement),
+                Statement::Do(_) => self.evaluate_do(statement),
+                Statement::Label(_) => todo!("How to deal with labels"),
+                Statement::Goto(_) => todo!("How to deal with goto's"),
+                Statement::Empty => {}
+                Statement::Break => todo!("Break outside a loop"),
                 _ => unreachable!("Expected statement, found {:?}", statement),
             }
         }
+        println!("Scope after: {:?}", self.scopes.last().unwrap());
+        self.scopes.pop();
+    }
+
+    fn evaluate_do(&mut self, statement: &Statement) {
+        let Statement::Do(block) = statement else {
+            unreachable!("Expected do statement, found {:?}", statement);
+        };
+        self.evaluate_block(block);
     }
 
     fn evaluate_global_variables(&mut self, statement: &Statement) {
@@ -126,6 +146,7 @@ impl<'a> Interpreter<'a> {
     fn evaluate_expression(&mut self, expression: &Expression) -> Value {
         match expression {
             Expression::Integer(n) => Value::Integer(*n),
+            Expression::Float(n) => Value::Float(*n),
             Expression::True => Value::Bool(true),
             Expression::False => Value::Bool(false),
             Expression::Nil => Value::Nil,

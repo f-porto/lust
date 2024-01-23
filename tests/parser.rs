@@ -21,6 +21,8 @@ fn markov() -> Result<(), Box<dyn Error>> {
     };
     let ast = build_ast(&mut pairs);
 
+    // Takes to long to format this, I'll try to rewrite this in another way, because *sigh* this way sucks
+    #[rustfmt::skip]
     let expected = Block {
         statements: vec![Statement::FunctionDefinition {
             function_name: FunctionName {

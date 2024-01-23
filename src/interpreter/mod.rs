@@ -66,18 +66,27 @@ impl Value {
     }
 }
 
+#[derive(Debug)]
+enum Command {
+    Continue,
+    Goto(String),
+    Break,
+}
+
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
         Self { scopes: vec![] }
     }
 
     pub fn interpret(&mut self, block: &'a Block) {
-        if let Some(name) = self.evaluate_block(block) {
-            todo!("No visible label '{name}' for <goto>");
+        match self.evaluate_block(block) {
+            Command::Goto(name) => todo!("No visible label '{name}' for <goto>"),
+            Command::Break => todo!("Break outside a loop"),
+            _ => {}
         }
     }
 
-    fn evaluate_block(&mut self, block: &'a Block) -> Option<String> {
+    fn evaluate_block(&mut self, block: &'a Block) -> Command {
         let mut scope = Scope::new(block);
         scope.look_for_labels();
         self.scopes.push(scope);
@@ -90,29 +99,52 @@ impl<'a> Interpreter<'a> {
                 Statement::Assignment { .. } => self.evaluate_global_variables(statement),
                 Statement::Do(_) => self.evaluate_do(statement),
                 Statement::If { .. } => self.evaluate_if(statement),
-                Statement::Goto(name) => Some(name.clone()),
-                Statement::Label(_) => None,
-                Statement::Empty => None,
-                Statement::Break => todo!("Break outside a loop"),
+                Statement::While { .. } => self.evaluate_while(statement),
+                Statement::Goto(name) => Command::Goto(name.clone()),
+                Statement::Label(_) => Command::Continue,
+                Statement::Empty => Command::Continue,
+                Statement::Break => Command::Break,
                 _ => unreachable!("Expected statement, found {:?}", statement),
             };
-            if let Some(name) = label {
-                if let Some(pos) = self.scopes.last().unwrap().labels.get(&name) {
-                    i = *pos;
-                } else {
-                    let scope = self.scopes.pop().unwrap();
-                    println!("Scope after: {:?}", scope);
-                    return Some(name.clone());
+            match label {
+                Command::Goto(name) => {
+                    if let Some(pos) = self.scopes.last().unwrap().labels.get(&name) {
+                        i = *pos;
+                    } else {
+                        let scope = self.scopes.pop().unwrap();
+                        println!("Scope after: {:?}", scope);
+                        return Command::Goto(name);
+                    }
                 }
+                Command::Break => {
+                    self.scopes.pop();
+                    return Command::Break;
+                }
+                _ => {}
             }
             i += 1;
         }
         println!("[END] Scope after: {:?}", self.scopes.last().unwrap());
         self.scopes.pop();
-        return None;
+        Command::Continue
     }
 
-    fn evaluate_if(&mut self, statement: &'a Statement) -> Option<String> {
+    fn evaluate_while(&mut self, statement: &'a Statement) -> Command {
+        let Statement::While { condition, block } = statement else {
+            unreachable!("Expected while statement, found {:?}", statement);
+        };
+        while self.evaluate_expression(condition).is_truthy() {
+            let label = self.evaluate_block(block);
+            match label {
+                Command::Goto(_) => return label,
+                Command::Break => break,
+                _ => {}
+            }
+        }
+        Command::Continue
+    }
+
+    fn evaluate_if(&mut self, statement: &'a Statement) -> Command {
         let Statement::If { ifs, r#else } = statement else {
             unreachable!("Expected if statement, found {:?}", statement);
         };
@@ -124,19 +156,19 @@ impl<'a> Interpreter<'a> {
             }
         }
         let Some(block) = r#else else {
-            return None;
+            return Command::Continue;
         };
         self.evaluate_block(block)
     }
 
-    fn evaluate_do(&mut self, statement: &'a Statement) -> Option<String> {
+    fn evaluate_do(&mut self, statement: &'a Statement) -> Command {
         let Statement::Do(block) = statement else {
             unreachable!("Expected do statement, found {:?}", statement);
         };
         return self.evaluate_block(block);
     }
 
-    fn evaluate_global_variables(&mut self, statement: &Statement) -> Option<String> {
+    fn evaluate_global_variables(&mut self, statement: &Statement) -> Command {
         let Statement::Assignment {
             variable_list,
             expr_list,
@@ -156,10 +188,10 @@ impl<'a> Interpreter<'a> {
                 Variable::Selector { .. } => todo!(),
             }
         }
-        None
+        Command::Continue
     }
 
-    fn evaluate_local_variables(&mut self, statement: &Statement) -> Option<String> {
+    fn evaluate_local_variables(&mut self, statement: &Statement) -> Command {
         let Statement::LocalVariables {
             variables,
             expr_list,
@@ -174,7 +206,7 @@ impl<'a> Interpreter<'a> {
                     .unwrap()
                     .insert(variable.name.clone(), Value::Nil);
             }
-            return None;
+            return Command::Continue;
         }
         let values: Vec<_> = expr_list
             .as_ref()
@@ -190,7 +222,7 @@ impl<'a> Interpreter<'a> {
                 .unwrap()
                 .insert(variable.name.clone(), value);
         }
-        None
+        Command::Continue
     }
 
     fn evaluate_expression(&mut self, expression: &Expression) -> Value {
@@ -201,7 +233,7 @@ impl<'a> Interpreter<'a> {
             Expression::False => Value::False,
             Expression::Nil => Value::Nil,
             Expression::String(str) => Value::String(str.clone()),
-            _ => todo!(),
+            _ => todo!("{:?}", expression),
         }
     }
 }

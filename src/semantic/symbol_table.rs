@@ -45,7 +45,7 @@ impl SymbolTable {
         else {
             unreachable!("Expected local variables, got {:?}", statement);
         };
-        if let Some(expr_list) = expr_list {}
-        for variable in variables {}
+        if let Some(_) = expr_list {}
+        for _ in variables {}
     }
 }

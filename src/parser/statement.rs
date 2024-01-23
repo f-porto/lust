@@ -71,7 +71,6 @@ pub enum Statement {
         variables: Vec<LocalVariable>,
         expr_list: Option<Vec<Expression>>,
     },
-    Return(Return),
 }
 
 #[derive(Debug, PartialEq)]

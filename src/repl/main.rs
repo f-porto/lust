@@ -17,6 +17,6 @@ fn main() {
     };
     let program = build_ast(&mut pairs);
     // let symbol_table = SymbolTable::new(&program);
-    let mut interpreter = Interpreter::new(&program);
-    interpreter.interpret();
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret(&program);
 }

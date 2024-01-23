@@ -7,19 +7,30 @@ use crate::parser::{
 
 #[derive(Debug)]
 pub struct Interpreter<'a> {
-    pub program: &'a Block,
-    pub scopes: Vec<Scope>,
+    pub scopes: Vec<Scope<'a>>,
 }
 
 #[derive(Debug)]
-pub struct Scope {
+pub struct Scope<'a> {
+    block: &'a Block,
     table: HashMap<String, Value>,
+    labels: HashMap<String, usize>,
 }
 
-impl Scope {
-    fn new() -> Self {
+impl<'a> Scope<'a> {
+    fn new(block: &'a Block) -> Self {
         Self {
+            block,
             table: HashMap::new(),
+            labels: HashMap::new(),
+        }
+    }
+
+    fn look_for_labels(&mut self) {
+        for (i, statement) in self.block.statements.iter().enumerate() {
+            if let Statement::Label(name) = statement {
+                self.labels.insert(name.clone(), i);
+            }
         }
     }
 
@@ -49,40 +60,64 @@ enum Value {
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn new(program: &'a Block) -> Self {
-        Self {
-            program,
-            scopes: vec![],
+    pub fn new() -> Self {
+        Self { scopes: vec![] }
+    }
+
+    pub fn interpret(&mut self, block: &'a Block) {
+        if let Some(name) = self.evaluate_block(block) {
+            todo!("No visible label '{name}' for <goto>");
         }
     }
 
-    pub fn interpret(&mut self) {
-        self.evaluate_block(self.program);
-    }
+    fn evaluate_block(&mut self, block: &'a Block) -> Option<String> {
+        let mut scope = Scope::new(block);
+        scope.look_for_labels();
+        self.scopes.push(scope);
 
-    fn evaluate_block(&mut self, block: &Block) {
-        self.scopes.push(Scope::new());
-        for statement in block.statements.iter() {
+        let mut i = 0;
+        while i < block.statements.len() {
+            let statement = &block.statements[i];
             match statement {
                 Statement::LocalVariables { .. } => self.evaluate_local_variables(statement),
                 Statement::Assignment { .. } => self.evaluate_global_variables(statement),
-                Statement::Do(_) => self.evaluate_do(statement),
-                Statement::Label(_) => todo!("How to deal with labels"),
-                Statement::Goto(_) => todo!("How to deal with goto's"),
+                Statement::Do(_) => {
+                    if let Some(name) = self.evaluate_do(statement) {
+                        if let Some(pos) = self.scopes.last().unwrap().labels.get(&name) {
+                            i = *pos;
+                        } else {
+                            let scope = self.scopes.pop().unwrap();
+                            println!("Scope after: {:?}", scope);
+                            return Some(name);
+                        }
+                    }
+                }
+                Statement::Goto(name) => {
+                    if let Some(pos) = self.scopes.last().unwrap().labels.get(name) {
+                        i = *pos;
+                    } else {
+                        let scope = self.scopes.pop().unwrap();
+                        println!("Scope after: {:?}", scope);
+                        return Some(name.clone());
+                    }
+                }
+                Statement::Label(_) => {}
                 Statement::Empty => {}
                 Statement::Break => todo!("Break outside a loop"),
                 _ => unreachable!("Expected statement, found {:?}", statement),
             }
+            i += 1;
         }
-        println!("Scope after: {:?}", self.scopes.last().unwrap());
+        println!("[END] Scope after: {:?}", self.scopes.last().unwrap());
         self.scopes.pop();
+        return None;
     }
 
-    fn evaluate_do(&mut self, statement: &Statement) {
+    fn evaluate_do(&mut self, statement: &'a Statement) -> Option<String> {
         let Statement::Do(block) = statement else {
             unreachable!("Expected do statement, found {:?}", statement);
         };
-        self.evaluate_block(block);
+        return self.evaluate_block(block);
     }
 
     fn evaluate_global_variables(&mut self, statement: &Statement) {
@@ -102,10 +137,7 @@ impl<'a> Interpreter<'a> {
             let value = values.next().unwrap_or(Value::Nil);
             match variable {
                 Variable::Name(name) => self.scopes[0].insert(name.clone(), value),
-                Variable::Selector {
-                    prefix_expr,
-                    selector,
-                } => todo!(),
+                Variable::Selector { .. } => todo!(),
             }
         }
     }

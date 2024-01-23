@@ -184,6 +184,90 @@ fn parse_table(mut pairs: Pairs<Rule>) -> Expression {
     Expression::Table(fields)
 }
 
+pub fn parse_integer(n: &str) -> i64 {
+    n.parse().unwrap()
+}
+
+pub fn parse_hex_integer(n: &str) -> i64 {
+    i64::from_str_radix(&n[2..], 16).unwrap()
+}
+
+pub fn parse_float(n: &str) -> f64 {
+    n.parse().unwrap()
+}
+
+pub fn parse_hex_float(n: &str) -> f64 {
+    let n = &n[2..];
+    let dot = n.find('.');
+    let p = n.find('p');
+
+    let integer;
+    let decimal;
+    let decimal_size;
+    let exponent;
+    let mut number = 0f64;
+    if let Some(dot) = dot {
+        if let Some(p) = p {
+            integer = i64::from_str_radix(&n[..dot], 16).unwrap_or(0);
+            decimal = i64::from_str_radix(&n[(dot + 1)..p], 16).unwrap_or(0);
+            decimal_size = p - dot - 1;
+            exponent = i64::from_str_radix(&n[(p + 1)..], 16).unwrap_or(0);
+        } else {
+            integer = i64::from_str_radix(&n[..dot], 16).unwrap_or(0);
+            decimal = i64::from_str_radix(&n[(dot + 1)..], 16).unwrap_or(0);
+            decimal_size = n.len() - dot - 1;
+            exponent = 0;
+        }
+    } else {
+        if let Some(p) = p {
+            integer = i64::from_str_radix(&n[..p], 16).unwrap_or(0);
+            decimal = 0;
+            decimal_size = 0;
+            exponent = i64::from_str_radix(&n[(p + 1)..], 16).unwrap_or(0);
+        } else {
+            integer = i64::from_str_radix(&n[..], 16).unwrap_or(0);
+            decimal = 0;
+            decimal_size = 0;
+            exponent = 0;
+        }
+    }
+    number += integer as f64;
+    if decimal_size > 0 {
+        number += decimal as f64 / 16f64.powf(decimal_size as f64);
+    }
+    number = number * 2f64.powf(exponent as f64);
+    number
+}
+
+pub fn parse_string(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut is_escaped = false;
+    for c in text.chars() {
+        if is_escaped {
+            let cc = match c {
+                'n' => '\n',
+                't' => '\t',
+                '\\' => '\\',
+                '\'' => '\'',
+                '"' => '"',
+                _ => todo!("Unknown escapes character '\\{c}'"),
+            };
+            result.push(cc);
+            is_escaped = false;
+        } else if c == '\\' {
+            is_escaped = true;
+        } else {
+            result.push(c);
+        }
+    }
+    println!("{result}");
+    result
+}
+
+pub fn parse_raw_string(text: &str) -> String {
+    text.into()
+}
+
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
     EXPR_PARSER
         .map_primary(|primary| match primary.as_rule() {
@@ -191,11 +275,13 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expression {
             Rule::False => Expression::False,
             Rule::VarArg => Expression::VarArg,
             Rule::Nil => Expression::Nil,
-            Rule::Integer => Expression::Integer(primary.as_str().parse().unwrap()),
-            Rule::Float => Expression::Float(primary.as_str().parse().unwrap()),
-            Rule::SqString => Expression::String(primary.into_inner().as_str().into()),
-            Rule::DqString => Expression::String(primary.into_inner().as_str().into()),
-            Rule::RawString => Expression::String(primary.into_inner().as_str().into()),
+            Rule::Integer => Expression::Integer(parse_integer(primary.as_str())),
+            Rule::HexInteger => Expression::Integer(parse_hex_integer(primary.as_str())),
+            Rule::Float => Expression::Float(parse_float(primary.as_str())),
+            Rule::HexFloat => Expression::Float(parse_hex_float(primary.as_str())),
+            Rule::SqString => Expression::String(parse_string(primary.into_inner().as_str())),
+            Rule::DqString => Expression::String(parse_string(primary.into_inner().as_str())),
+            Rule::RawString => Expression::String(parse_raw_string(primary.into_inner().as_str())),
             Rule::Lambda => {
                 let (parameters, body) =
                     parse_function_body(primary.into_inner().next().unwrap().into_inner());

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::parser::{
     expression::Expression,
-    statement::{Block, Parameters, Statement, Variable},
+    statement::{Block, If, Parameters, Statement, Variable},
 };
 
 #[derive(Debug)]
@@ -51,12 +51,19 @@ struct Table {
 #[derive(Debug)]
 enum Value {
     Nil,
-    Bool(bool),
+    False,
+    True,
     Integer(i64),
     Float(f64),
     String(String),
     Table(Table),
     Lambda { parameters: Parameters, body: Block },
+}
+
+impl Value {
+    fn is_truthy(self) -> bool {
+        !matches!(self, Value::False | Value::Nil)
+    }
 }
 
 impl<'a> Interpreter<'a> {
@@ -78,39 +85,48 @@ impl<'a> Interpreter<'a> {
         let mut i = 0;
         while i < block.statements.len() {
             let statement = &block.statements[i];
-            match statement {
+            let label = match statement {
                 Statement::LocalVariables { .. } => self.evaluate_local_variables(statement),
                 Statement::Assignment { .. } => self.evaluate_global_variables(statement),
-                Statement::Do(_) => {
-                    if let Some(name) = self.evaluate_do(statement) {
-                        if let Some(pos) = self.scopes.last().unwrap().labels.get(&name) {
-                            i = *pos;
-                        } else {
-                            let scope = self.scopes.pop().unwrap();
-                            println!("Scope after: {:?}", scope);
-                            return Some(name);
-                        }
-                    }
-                }
-                Statement::Goto(name) => {
-                    if let Some(pos) = self.scopes.last().unwrap().labels.get(name) {
-                        i = *pos;
-                    } else {
-                        let scope = self.scopes.pop().unwrap();
-                        println!("Scope after: {:?}", scope);
-                        return Some(name.clone());
-                    }
-                }
-                Statement::Label(_) => {}
-                Statement::Empty => {}
+                Statement::Do(_) => self.evaluate_do(statement),
+                Statement::If { .. } => self.evaluate_if(statement),
+                Statement::Goto(name) => Some(name.clone()),
+                Statement::Label(_) => None,
+                Statement::Empty => None,
                 Statement::Break => todo!("Break outside a loop"),
                 _ => unreachable!("Expected statement, found {:?}", statement),
+            };
+            if let Some(name) = label {
+                if let Some(pos) = self.scopes.last().unwrap().labels.get(&name) {
+                    i = *pos;
+                } else {
+                    let scope = self.scopes.pop().unwrap();
+                    println!("Scope after: {:?}", scope);
+                    return Some(name.clone());
+                }
             }
             i += 1;
         }
         println!("[END] Scope after: {:?}", self.scopes.last().unwrap());
         self.scopes.pop();
         return None;
+    }
+
+    fn evaluate_if(&mut self, statement: &'a Statement) -> Option<String> {
+        let Statement::If { ifs, r#else } = statement else {
+            unreachable!("Expected if statement, found {:?}", statement);
+        };
+        for r#if in ifs {
+            let If { condition, block } = r#if;
+            let result = self.evaluate_expression(condition);
+            if result.is_truthy() {
+                return self.evaluate_block(block);
+            }
+        }
+        let Some(block) = r#else else {
+            return None;
+        };
+        self.evaluate_block(block)
     }
 
     fn evaluate_do(&mut self, statement: &'a Statement) -> Option<String> {
@@ -120,7 +136,7 @@ impl<'a> Interpreter<'a> {
         return self.evaluate_block(block);
     }
 
-    fn evaluate_global_variables(&mut self, statement: &Statement) {
+    fn evaluate_global_variables(&mut self, statement: &Statement) -> Option<String> {
         let Statement::Assignment {
             variable_list,
             expr_list,
@@ -140,9 +156,10 @@ impl<'a> Interpreter<'a> {
                 Variable::Selector { .. } => todo!(),
             }
         }
+        None
     }
 
-    fn evaluate_local_variables(&mut self, statement: &Statement) {
+    fn evaluate_local_variables(&mut self, statement: &Statement) -> Option<String> {
         let Statement::LocalVariables {
             variables,
             expr_list,
@@ -157,7 +174,7 @@ impl<'a> Interpreter<'a> {
                     .unwrap()
                     .insert(variable.name.clone(), Value::Nil);
             }
-            return;
+            return None;
         }
         let values: Vec<_> = expr_list
             .as_ref()
@@ -173,14 +190,15 @@ impl<'a> Interpreter<'a> {
                 .unwrap()
                 .insert(variable.name.clone(), value);
         }
+        None
     }
 
     fn evaluate_expression(&mut self, expression: &Expression) -> Value {
         match expression {
             Expression::Integer(n) => Value::Integer(*n),
             Expression::Float(n) => Value::Float(*n),
-            Expression::True => Value::Bool(true),
-            Expression::False => Value::Bool(false),
+            Expression::True => Value::True,
+            Expression::False => Value::False,
             Expression::Nil => Value::Nil,
             Expression::String(str) => Value::String(str.clone()),
             _ => todo!(),

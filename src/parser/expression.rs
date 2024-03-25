@@ -173,7 +173,7 @@ fn parse_field(mut pairs: Pairs<Rule>) -> Field {
     }
 }
 
-fn parse_table(mut pairs: Pairs<Rule>) -> Expression {
+pub fn parse_table(mut pairs: Pairs<Rule>) -> Expression {
     let Some(pair) = pairs.next() else {
         return Expression::Table(vec![]);
     };
@@ -260,7 +260,7 @@ pub fn parse_string(text: &str) -> String {
             result.push(c);
         }
     }
-    println!("{}:{}:{}: {result}", file!(), line!(), column!());
+    // println!("{}:{}:{}: {result}", file!(), line!(), column!());
     result
 }
 

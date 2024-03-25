@@ -5,6 +5,8 @@ use crate::{
     parser::Rule,
 };
 
+use super::expression::parse_table;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub primary: Primary,
@@ -21,7 +23,7 @@ pub enum Primary {
 pub enum Argument {
     List(Vec<Expression>),
     String(String),
-    Table,
+    Table(Expression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -71,7 +73,7 @@ fn parse_arguments(mut pairs: Pairs<Rule>) -> Argument {
         Rule::SqString => Argument::String(pair.as_str().into()),
         Rule::DqString => Argument::String(pair.as_str().into()),
         Rule::RawString => Argument::String(pair.as_str().into()),
-        Rule::Table => Argument::Table,
+        Rule::Table => Argument::Table(parse_table(pair.into_inner())),
         Rule::ExpressionList => {
             let exprs = pair
                 .into_inner()

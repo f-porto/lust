@@ -10,14 +10,14 @@ use crate::{
     parser::Rule,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Field {
     ExprKey { key: Expression, value: Expression },
     NameKey { name: String, value: Expression },
     Expr(Expression),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Integer(i64),
     Float(f64),
@@ -260,7 +260,7 @@ pub fn parse_string(text: &str) -> String {
             result.push(c);
         }
     }
-    println!("{result}");
+    println!("{}:{}:{}: {result}", file!(), line!(), column!());
     result
 }
 

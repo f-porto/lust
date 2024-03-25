@@ -1,9 +1,10 @@
-mod value;
+pub mod value;
 
-use std::{collections::HashMap, vec};
+use std::{collections::HashMap, error::Error, mem, vec};
 
 use crate::parser::{
     expression::Expression,
+    prefix_expression::{Argument, CallSuffix},
     statement::{Block, FunctionName, If, Parameters, Statement, Variable},
 };
 
@@ -38,7 +39,7 @@ impl<'a> Scope<'a> {
         }
     }
 
-    fn insert(&mut self, name: String, value: Value) {
+    pub fn insert(&mut self, name: String, value: Value) {
         self.table.insert(name, value);
     }
 
@@ -56,6 +57,7 @@ enum Command {
     Continue,
     Goto(String),
     Break,
+    Error(Box<dyn Error>),
 }
 
 impl<'a> Interpreter<'a> {
@@ -64,11 +66,22 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn interpret(&mut self, block: &'a Block) {
+        let global_block = Block {
+            statements: vec![],
+            return_statement: None,
+        };
+        let global_block = Box::new(global_block);
+        let global_block = Box::leak(global_block);
+        let mut scope = Scope::new(global_block);
+        crate::std::load_std(&mut scope);
+        self.scopes.push(scope);
         match self.evaluate_block(block) {
             Command::Goto(name) => todo!("No visible label '{name}' for <goto>"),
             Command::Break => todo!("Break outside a loop"),
+            Command::Error(err) => todo!("Error happened: {err}"),
             _ => {}
         }
+        self.scopes.pop();
     }
 
     fn evaluate_block(&mut self, block: &'a Block) -> Command {
@@ -92,6 +105,8 @@ impl<'a> Interpreter<'a> {
                 Statement::FunctionDefinition { .. } => {
                     self.evaluate_global_function_definition(statement)
                 }
+                Statement::NumericalFor { .. } => self.evaluate_numerical_for(statement),
+                Statement::FunctionCall { .. } => self.evaluate_function_call(statement),
                 Statement::Goto(name) => Command::Goto(name.clone()),
                 Statement::Label(_) => Command::Continue,
                 Statement::Empty => Command::Continue,
@@ -112,12 +127,44 @@ impl<'a> Interpreter<'a> {
                     self.scopes.pop();
                     return Command::Break;
                 }
+                Command::Error(err) => {
+                    self.scopes.pop();
+                    return Command::Error(err);
+                }
                 _ => {}
             }
             i += 1;
         }
-        println!("[END] Scope after: {:?}", self.scopes.last().unwrap());
+        // println!("[END] Scope after: {:?}", self.scopes.last().unwrap());
         self.scopes.pop();
+        Command::Continue
+    }
+
+    fn evaluate_function_call(&mut self, statement: &'a Statement) -> Command {
+        let Statement::FunctionCall { prefix_exp, call } = statement else {
+            unreachable!("Expected function call, found: {:?}", statement);
+        };
+        let Some(f) = self.get("print") else {
+            todo!("Error if variable is not found");
+        };
+        if !matches!(f, Value::Builtin(_) | Value::Lambda { .. }) {
+            todo!("Error if variable is not a function");
+        }
+        let arg = match call {
+            CallSuffix::Simple(arg) => arg,
+            CallSuffix::Method { name, argument } => argument,
+        };
+        let values = match arg {
+            Argument::List(args) => args.iter().map(|x| self.evaluate_expression(x)).collect(),
+            Argument::String(s) => vec![Value::String(s.clone())],
+            Argument::Table(t) => vec![self.evaluate_expression(t)],
+        };
+        let f = self.get("print").unwrap();
+        match f {
+            Value::Builtin(f) => f.call(values),
+            Value::Lambda { parameters, body } => todo!(),
+            _ => unreachable!("Expected function, found {:?}", f),
+        };
         Command::Continue
     }
 
@@ -162,13 +209,7 @@ impl<'a> Interpreter<'a> {
         function_name: &str,
         body: Value,
     ) {
-        let mut value = None;
-        for scope in self.scopes.iter_mut().rev() {
-            value = scope.get_mut(table_name);
-            if value.is_some() {
-                break;
-            }
-        }
+        let value = self.get_mut(table_name);
         let Some(Value::Table(t)) = value else {
             return;
         };
@@ -190,13 +231,7 @@ impl<'a> Interpreter<'a> {
         method_name: &str,
         body: Value,
     ) {
-        let mut value = None;
-        for scope in self.scopes.iter_mut().rev() {
-            value = scope.get_mut(table_name);
-            if value.is_some() {
-                break;
-            }
-        }
+        let value = self.get_mut(table_name);
         let Some(Value::Table(t)) = value else {
             return;
         };
@@ -259,10 +294,28 @@ impl<'a> Interpreter<'a> {
             .map(|x| self.evaluate_expression(x))
             .unwrap_or(Value::Integer(1));
 
-        if matches!(
+        let mut initial = match initial.to_number() {
+            Ok(v) => v,
+            Err(e) => return Command::Error(e),
+        };
+        let mut limit = match limit.to_number() {
+            Ok(v) => v,
+            Err(e) => return Command::Error(e),
+        };
+        let mut step = match step.to_number() {
+            Ok(v) => v,
+            Err(e) => return Command::Error(e),
+        };
+        if !matches!(
             (&initial, &limit, &step),
             (Value::Integer(_), Value::Integer(_), Value::Integer(_))
-        ) {}
+        ) {
+            initial = initial.to_float().unwrap();
+            limit = limit.to_float().unwrap();
+            step = step.to_float().unwrap();
+        }
+        let limit = limit;
+        let step = step;
 
         let for_block = Block {
             statements: vec![],
@@ -272,8 +325,19 @@ impl<'a> Interpreter<'a> {
         let ref_block: &'static _ = Box::leak(for_block);
         let mut scope = Scope::new(&ref_block);
         scope.insert(control.clone(), initial);
-        let initial = scope.get_mut(&control).unwrap();
         self.scopes.push(scope);
+        let index = self.scopes.len() - 1;
+
+        let mut i = self.get_from(&control, index).unwrap();
+        while i.is_less_or_equal(&limit).unwrap() {
+            self.evaluate_block(block);
+
+            let initial = self.get_mut_from(&control, index).unwrap();
+            let r = initial.add(&step).unwrap();
+            let _ = mem::replace(initial, r);
+
+            i = self.get_from(&control, index).unwrap();
+        }
 
         self.scopes.pop();
         Command::Continue
@@ -288,6 +352,7 @@ impl<'a> Interpreter<'a> {
             match label {
                 Command::Goto(_) => return label,
                 Command::Break => break,
+                Command::Error(_) => return label,
                 _ => {}
             }
         }
@@ -309,6 +374,7 @@ impl<'a> Interpreter<'a> {
             match label {
                 Command::Goto(_) => return label,
                 Command::Break => break,
+                Command::Error(_) => return label,
                 _ => {}
             }
         }
@@ -416,5 +482,35 @@ impl<'a> Interpreter<'a> {
             }
             _ => todo!("Evaluate expression: {:?}", expression),
         }
+    }
+
+    fn get_from(&self, name: &str, index: usize) -> Option<&Value> {
+        self.scopes[index].get(name)
+    }
+
+    fn get_mut_from(&mut self, name: &str, index: usize) -> Option<&mut Value> {
+        self.scopes[index].get_mut(name)
+    }
+
+    fn get(&self, name: &str) -> Option<&Value> {
+        let mut value = None;
+        for scope in self.scopes.iter().rev() {
+            value = scope.get(name);
+            if value.is_some() {
+                break;
+            }
+        }
+        value
+    }
+
+    fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
+        let mut value = None;
+        for scope in self.scopes.iter_mut().rev() {
+            value = scope.get_mut(name);
+            if value.is_some() {
+                break;
+            }
+        }
+        value
     }
 }

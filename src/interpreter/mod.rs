@@ -1,9 +1,13 @@
-use std::collections::HashMap;
+mod value;
+
+use std::{collections::HashMap, vec};
 
 use crate::parser::{
     expression::Expression,
-    statement::{Block, If, Parameters, Statement, Variable},
+    statement::{Block, FunctionName, If, Parameters, Statement, Variable},
 };
+
+use self::value::{Table, Value};
 
 #[derive(Debug)]
 pub struct Interpreter<'a> {
@@ -38,31 +42,12 @@ impl<'a> Scope<'a> {
         self.table.insert(name, value);
     }
 
-    fn get(&mut self, name: String) -> &Value {
-        self.table.get(&name).unwrap_or(&Value::Nil)
+    fn get(&self, name: &str) -> Option<&Value> {
+        self.table.get(name)
     }
-}
 
-#[derive(Debug)]
-struct Table {
-    table: HashMap<Value, Value>,
-}
-
-#[derive(Debug)]
-enum Value {
-    Nil,
-    False,
-    True,
-    Integer(i64),
-    Float(f64),
-    String(String),
-    Table(Table),
-    Lambda { parameters: Parameters, body: Block },
-}
-
-impl Value {
-    fn is_truthy(self) -> bool {
-        !matches!(self, Value::False | Value::Nil)
+    fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
+        self.table.get_mut(name)
     }
 }
 
@@ -100,6 +85,13 @@ impl<'a> Interpreter<'a> {
                 Statement::Do(_) => self.evaluate_do(statement),
                 Statement::If { .. } => self.evaluate_if(statement),
                 Statement::While { .. } => self.evaluate_while(statement),
+                Statement::Repeat { .. } => self.evaluate_repeat(statement),
+                Statement::LocalFunctionDefinition { .. } => {
+                    self.evaluate_local_function_definition(statement)
+                }
+                Statement::FunctionDefinition { .. } => {
+                    self.evaluate_global_function_definition(statement)
+                }
                 Statement::Goto(name) => Command::Goto(name.clone()),
                 Statement::Label(_) => Command::Continue,
                 Statement::Empty => Command::Continue,
@@ -129,11 +121,190 @@ impl<'a> Interpreter<'a> {
         Command::Continue
     }
 
+    fn evaluate_global_function_definition(&mut self, statement: &'a Statement) -> Command {
+        let Statement::FunctionDefinition {
+            function_name,
+            parameters,
+            body,
+        } = statement
+        else {
+            unreachable!("Expected function definition, found {:?}", statement);
+        };
+        let parameters = parameters.clone().unwrap_or(Parameters {
+            name_list: vec![],
+            var_arg: false,
+        });
+        let lambda = Value::Lambda {
+            parameters,
+            body: body.clone(),
+        };
+        let FunctionName { names, method } = function_name;
+        if let Some(method) = method {
+            self.add_method_to_table(&names[0], &names[1..], method, lambda)
+        } else if names.len() == 1 {
+            self.add_function(&names[0], lambda);
+        } else {
+            let last = names.len() - 1;
+            let members = &names[1..last];
+            self.add_function_to_table(&names[0], members, &names[last], lambda);
+        }
+        Command::Continue
+    }
+
+    fn add_function(&mut self, function_name: &str, body: Value) {
+        self.scopes[0].insert(function_name.to_string(), body)
+    }
+
+    fn add_function_to_table(
+        &mut self,
+        table_name: &str,
+        members: &[String],
+        function_name: &str,
+        body: Value,
+    ) {
+        let mut value = None;
+        for scope in self.scopes.iter_mut().rev() {
+            value = scope.get_mut(table_name);
+            if value.is_some() {
+                break;
+            }
+        }
+        let Some(Value::Table(t)) = value else {
+            return;
+        };
+        let mut table = t;
+        for member in members.iter() {
+            let value = table.get_mut(&Value::String(member.to_string()));
+            let Some(Value::Table(t)) = value else {
+                return;
+            };
+            table = t;
+        }
+        table.insert(&Value::String(function_name.to_string()), &body);
+    }
+
+    fn add_method_to_table(
+        &mut self,
+        table_name: &str,
+        members: &[String],
+        method_name: &str,
+        body: Value,
+    ) {
+        let mut value = None;
+        for scope in self.scopes.iter_mut().rev() {
+            value = scope.get_mut(table_name);
+            if value.is_some() {
+                break;
+            }
+        }
+        let Some(Value::Table(t)) = value else {
+            return;
+        };
+        let mut table = t;
+        for member in members.iter() {
+            let value = table.get_mut(&Value::String(member.to_string()));
+            let Some(Value::Table(t)) = value else {
+                return;
+            };
+            table = t;
+        }
+        let Value::Lambda {
+            mut parameters,
+            body,
+        } = body
+        else {
+            unreachable!("Expected lambda, found {:?}", body);
+        };
+        parameters.name_list.insert(0, "self".to_string());
+        let body = Value::Lambda { parameters, body };
+        table.insert(&Value::String(method_name.to_string()), &body);
+    }
+
+    fn evaluate_local_function_definition(&mut self, statement: &'a Statement) -> Command {
+        let Statement::LocalFunctionDefinition {
+            name,
+            parameters,
+            body,
+        } = statement
+        else {
+            unreachable!("Expected function definition, found {:?}", statement);
+        };
+        let parameters = parameters.clone().unwrap_or(Parameters {
+            name_list: vec![],
+            var_arg: false,
+        });
+        let lambda = Value::Lambda {
+            parameters,
+            body: body.clone(),
+        };
+        self.scopes.last_mut().unwrap().insert(name.clone(), lambda);
+        Command::Continue
+    }
+
+    fn evaluate_numerical_for(&mut self, statement: &'a Statement) -> Command {
+        let Statement::NumericalFor {
+            control,
+            initial,
+            limit,
+            step,
+            block,
+        } = statement
+        else {
+            unreachable!("Expected numerical for, found {:?}", statement);
+        };
+        let initial = self.evaluate_expression(initial);
+        let limit = self.evaluate_expression(limit);
+        let step = step
+            .as_ref()
+            .map(|x| self.evaluate_expression(x))
+            .unwrap_or(Value::Integer(1));
+
+        if matches!(
+            (&initial, &limit, &step),
+            (Value::Integer(_), Value::Integer(_), Value::Integer(_))
+        ) {}
+
+        let for_block = Block {
+            statements: vec![],
+            return_statement: None,
+        };
+        let for_block = Box::new(for_block);
+        let ref_block: &'static _ = Box::leak(for_block);
+        let mut scope = Scope::new(&ref_block);
+        scope.insert(control.clone(), initial);
+        let initial = scope.get_mut(&control).unwrap();
+        self.scopes.push(scope);
+
+        self.scopes.pop();
+        Command::Continue
+    }
+
     fn evaluate_while(&mut self, statement: &'a Statement) -> Command {
         let Statement::While { condition, block } = statement else {
             unreachable!("Expected while statement, found {:?}", statement);
         };
         while self.evaluate_expression(condition).is_truthy() {
+            let label = self.evaluate_block(block);
+            match label {
+                Command::Goto(_) => return label,
+                Command::Break => break,
+                _ => {}
+            }
+        }
+        Command::Continue
+    }
+
+    fn evaluate_repeat(&mut self, statement: &'a Statement) -> Command {
+        let Statement::Repeat { block, condition } = statement else {
+            unreachable!("Expected repeat statement, found {:?}", statement);
+        };
+        let label = self.evaluate_block(block);
+        match label {
+            Command::Goto(_) => return label,
+            Command::Break => return Command::Continue,
+            _ => {}
+        }
+        while !self.evaluate_expression(condition).is_truthy() {
             let label = self.evaluate_block(block);
             match label {
                 Command::Goto(_) => return label,
@@ -233,7 +404,17 @@ impl<'a> Interpreter<'a> {
             Expression::False => Value::False,
             Expression::Nil => Value::Nil,
             Expression::String(str) => Value::String(str.clone()),
-            _ => todo!("{:?}", expression),
+            Expression::Lambda { parameters, body } => Value::Lambda {
+                parameters: parameters.clone().unwrap_or(Parameters {
+                    name_list: vec![],
+                    var_arg: false,
+                }),
+                body: body.clone(),
+            },
+            Expression::Table(fields) => {
+                Value::Table(Table::from_fields(fields, |e| self.evaluate_expression(e)))
+            }
+            _ => todo!("Evaluate expression: {:?}", expression),
         }
     }
 }

@@ -2,11 +2,14 @@ use std::{collections::HashMap, error::Error, fmt::Debug, hash::Hash};
 
 use pest::Parser;
 
-use crate::{parser::{
-    expression::{self, Expression, Field},
-    statement::{Block, Parameters},
-    LuaParser, Rule,
-}, std::Builtin};
+use crate::{
+    parser::{
+        expression::{self, Expression, Field},
+        statement::{Block, Parameters},
+        LuaParser, Rule,
+    },
+    std::Builtin,
+};
 
 #[derive(Debug, Clone)]
 pub struct Table {

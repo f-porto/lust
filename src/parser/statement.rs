@@ -9,6 +9,15 @@ pub struct Block {
     pub return_statement: Option<Return>,
 }
 
+impl Default for Block {
+    fn default() -> Self {
+        Self {
+            statements: vec![],
+            return_statement: None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Return(pub Option<Vec<Expression>>);
 

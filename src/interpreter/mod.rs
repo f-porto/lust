@@ -4,7 +4,7 @@ use std::{collections::HashMap, error::Error, mem, vec};
 
 use crate::parser::{
     expression::Expression,
-    prefix_expression::{Argument, CallSuffix},
+    prefix_expression::{Argument, CallSuffix, PExprAction, PrefixExpression, Primary, Selector},
     statement::{Block, FunctionName, If, Parameters, Statement, Variable},
 };
 
@@ -144,26 +144,42 @@ impl<'a> Interpreter<'a> {
         let Statement::FunctionCall { prefix_exp, call } = statement else {
             unreachable!("Expected function call, found: {:?}", statement);
         };
-        let Some(f) = self.get("print") else {
+        let Primary::Name(name) = &prefix_exp.primary else {
+            todo!("Deal with expressions")
+        };
+        let Some(object) = self.get(name) else {
             todo!("Error if variable is not found");
         };
-        if !matches!(f, Value::Builtin(_) | Value::Lambda { .. }) {
+        if !matches!(object, Value::Builtin(_) | Value::Lambda { .. }) {
             todo!("Error if variable is not a function");
         }
         let arg = match call {
             CallSuffix::Simple(arg) => arg,
-            CallSuffix::Method { name, argument } => argument,
+            CallSuffix::Method { .. } => todo!("How to call methods"),
         };
         let values = match arg {
             Argument::List(args) => args.iter().map(|x| self.evaluate_expression(x)).collect(),
             Argument::String(s) => vec![Value::String(s.clone())],
             Argument::Table(t) => vec![self.evaluate_expression(t)],
         };
-        let f = self.get("print").unwrap();
-        match f {
+        let object = self.get(name).unwrap().clone();
+        match object {
             Value::Builtin(f) => f.call(values),
-            Value::Lambda { parameters, body } => todo!(),
-            _ => unreachable!("Expected function, found {:?}", f),
+            Value::Lambda { parameters, body } => {
+                let body = Box::leak(Box::new(body));
+                let block = Box::leak(Box::new(Block::default()));
+                let mut scope = Scope::new(block);
+                let Parameters { name_list, var_arg } = parameters;
+                for (name, value) in name_list.into_iter().zip(values) {
+                    scope.insert(name, value)
+                }
+
+                self.scopes.push(scope);
+                self.evaluate_block(body);
+                self.scopes.pop();
+                Value::Nil
+            }
+            o => unreachable!("Expected function, found {:?}", o),
         };
         Command::Continue
     }
@@ -482,6 +498,40 @@ impl<'a> Interpreter<'a> {
             }
             _ => todo!("Evaluate expression: {:?}", expression),
         }
+    }
+
+    fn evaluate_expression_for_reference(&mut self, expression: &Expression) -> Option<&mut Value> {
+        match expression {
+            Expression::PrefixExpression(p) => self.evaluate_prefix_expression(p),
+            Expression::Lambda { parameters, body } => todo!(),
+            _ => None,
+        }
+    }
+
+    fn evaluate_prefix_expression(&mut self, prefix_expr: &PrefixExpression) -> Option<&mut Value> {
+        todo!("Damm fucking mutability");
+        let PrefixExpression { primary, actions } = prefix_expr;
+        let mut reference = match primary {
+            Primary::Name(name) => self.get_mut(name),
+            Primary::Expression(expression) => self.evaluate_expression_for_reference(expression),
+        }?;
+        for action in actions.iter() {
+            let x = match action {
+                PExprAction::Selector(selector) => match selector {
+                    Selector::Dot(name) => Value::String(name.to_string()),
+                    Selector::Key(expr) => self.evaluate_expression(expr),
+                },
+                PExprAction::Call(call) => match call {
+                    CallSuffix::Simple(arg) => todo!(),
+                    CallSuffix::Method { name, argument } => todo!(),
+                },
+            };
+            let Value::Table(table) = reference else {
+                return None;
+            };
+            reference = table.get_mut(&x)?;
+        }
+        Some(reference)
     }
 
     fn get_from(&self, name: &str, index: usize) -> Option<&Value> {

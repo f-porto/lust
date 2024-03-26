@@ -30,9 +30,17 @@ t.dosomthing()
 t:what()
 t:dosomthing()
 t.what(t)
-t0:hi()
+-- t0:hi()
 inside()
 
 for key, value in pairs(t) do
     print(key, value)
 end
+
+a = print(nil, false)
+print(a)
+-- c = coroutine.create(function (...)
+--     print("from coroutine")
+-- end)
+
+
